@@ -1,0 +1,97 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// 組織（マルチテナンシーの基本単位）
+model Organization {
+  id                  String   @id @default(cuid())
+  name                String
+  encOpenaiKey        String?  @map("enc_openai_key")  // AES-256-GCM暗号化
+  encAnthropicKey     String?  @map("enc_anthropic_key")
+  encGoogleKey        String?  @map("enc_google_key")
+  tokenMonthlyLimit   Int      @default(1000000) @map("token_monthly_limit")
+  currentUsage        Int      @default(0) @map("current_usage")
+
+  // AIモード設定（各モードに紐づくモデルID）
+  fastModeModel       String?  @map("fast_mode_model")      // 高速モード
+  balancedModeModel   String?  @map("balanced_mode_model")  // バランスモード
+  precisionModeModel  String?  @map("precision_mode_model") // 高精度モード
+
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  users               User[]
+  threads             Thread[]
+
+  @@map("organizations")
+}
+
+// ユーザー
+model User {
+  id             String       @id @default(cuid())
+  email          String       @unique
+  passwordHash   String       @map("password_hash")
+  role           UserRole     @default(MEMBER)
+  organizationId String       @map("organization_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  threads        Thread[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  OWNER
+  MEMBER
+}
+
+// チャットスレッド
+model Thread {
+  id             String       @id @default(cuid())
+  title          String       @default("New Chat")
+  organizationId String       @map("organization_id")
+  userId         String       @map("user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages       Message[]
+
+  @@map("threads")
+}
+
+// メッセージ
+model Message {
+  id            String   @id @default(cuid())
+  threadId      String   @map("thread_id")
+  role          MessageRole
+  content       String
+  modelId       String   @map("model_id")  // "gpt-4", "claude-3-5-sonnet", etc.
+  tokensUsed    Int      @default(0) @map("tokens_used")
+  costEstimate  Float    @default(0) @map("cost_estimate")  // USD
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  thread        Thread   @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+enum MessageRole {
+  user
+  assistant
+  system
+}
