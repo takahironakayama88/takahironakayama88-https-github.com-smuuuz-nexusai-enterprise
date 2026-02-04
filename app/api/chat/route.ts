@@ -42,10 +42,11 @@ export async function POST(request: NextRequest) {
 
     // リクエストボディの解析
     const body = await request.json();
-    const { messages: rawMessages, modeId, threadId, attachments } = body as {
+    const { messages: rawMessages, modeId, threadId, assistantId, attachments } = body as {
       messages: Array<any>;
       modeId: 'fast' | 'balanced' | 'precision';
       threadId?: string;
+      assistantId?: string;
       attachments?: Array<{
         name: string;
         type: string;
@@ -143,14 +144,34 @@ export async function POST(request: NextRequest) {
       return new Response('組織が見つかりません', { status: 404 });
     }
 
-    // モードからモデルIDを解決
-    const modeToModelMap: Record<string, string | null> = {
-      fast: organization.fastModeModel,
-      balanced: organization.balancedModeModel,
-      precision: organization.precisionModeModel,
-    };
+    // アシスタント情報を取得（指定されている場合）
+    let assistant: { systemPrompt: string; modelId: string | null } | null = null;
+    if (assistantId) {
+      const found = await prisma.assistant.findFirst({
+        where: {
+          id: assistantId,
+          organizationId: decoded.organizationId,
+          isActive: true,
+        },
+        select: { systemPrompt: true, modelId: true },
+      });
+      assistant = found;
+    }
 
-    const modelId = modeToModelMap[modeId] as ModelId | null;
+    // モードからモデルIDを解決（アシスタントにモデル指定があればそちらを優先）
+    let modelId: ModelId | null;
+
+    if (assistant?.modelId) {
+      modelId = assistant.modelId as ModelId;
+      console.log(`🤖 Assistant model override: ${modelId}`);
+    } else {
+      const modeToModelMap: Record<string, string | null> = {
+        fast: organization.fastModeModel,
+        balanced: organization.balancedModeModel,
+        precision: organization.precisionModeModel,
+      };
+      modelId = modeToModelMap[modeId] as ModelId | null;
+    }
 
     if (!modelId) {
       return new Response(`${modeId}モードのモデルが設定されていません`, { status: 400 });
@@ -170,10 +191,15 @@ export async function POST(request: NextRequest) {
       encGoogleKey: organization.encGoogleKey,
     });
 
+    // アシスタントのシステムプロンプトを先頭に注入
+    const chatMessages = assistant?.systemPrompt
+      ? [{ role: 'system' as const, content: assistant.systemPrompt }, ...messages]
+      : messages;
+
     // AI SDK v6: ストリーミングレスポンスを生成
     const result = streamText({
       model,
-      messages,
+      messages: chatMessages,
       async onFinish({ usage, text }) {
         // トークン使用量を記録
         const tokensUsed = (usage.promptTokens || 0) + (usage.completionTokens || 0);

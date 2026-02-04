@@ -19,8 +19,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Scale, Target, Settings, Shield } from 'lucide-react';
+import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Scale, Target, Settings, Shield, Bot } from 'lucide-react';
 import { AuditSection } from '@/components/audit/AuditSection';
+import { AssistantManagementSection } from '@/components/assistants/AssistantManagementSection';
 
 interface UserData {
   id: string;
@@ -49,7 +50,7 @@ interface ModeSettings {
 
 type Provider = 'openai' | 'anthropic' | 'google';
 type ModeId = 'fast' | 'balanced' | 'precision';
-type DashboardTab = 'settings' | 'audit';
+type DashboardTab = 'settings' | 'assistants' | 'audit';
 
 const PROVIDER_INFO = {
   openai: { name: 'ChatGPT', color: 'from-green-500 to-emerald-600' },
@@ -297,6 +298,17 @@ export default function DashboardPage() {
             >
               <Settings className="w-4 h-4" />
               設定
+            </button>
+            <button
+              onClick={() => setDashboardTab('assistants')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                dashboardTab === 'assistants'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+              }`}
+            >
+              <Bot className="w-4 h-4" />
+              アシスタント
             </button>
             <button
               onClick={() => setDashboardTab('audit')}
@@ -569,6 +581,13 @@ export default function DashboardPage() {
           </div>
         </div>
         </>
+        )}
+
+        {/* アシスタントタブ */}
+        {dashboardTab === 'assistants' && user.role === 'OWNER' && (
+          <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
+            <AssistantManagementSection token={token} />
+          </div>
         )}
 
         {/* 監査ログタブ */}

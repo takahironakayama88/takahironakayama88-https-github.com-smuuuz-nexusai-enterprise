@@ -75,13 +75,14 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title } = body as { title?: string };
+    const { title, assistantId } = body as { title?: string; assistantId?: string };
 
     const thread = await prisma.thread.create({
       data: {
         title: title || 'New Chat',
         userId: decoded.userId,
         organizationId: decoded.organizationId,
+        assistantId: assistantId || null,
       },
     });
 

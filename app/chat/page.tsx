@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Plus, Send, User, Bot, Menu, LogOut, Copy, Check, Loader2, Pencil, Trash2, Save, X, LayoutDashboard, Paperclip } from 'lucide-react';
+import { Plus, Send, User, Bot, Menu, LogOut, Copy, Check, Loader2, Pencil, Trash2, Save, X, LayoutDashboard, Paperclip, Sparkles, ChevronDown } from 'lucide-react';
 
 interface Thread {
   id: string;
@@ -44,6 +44,29 @@ interface Mode {
   modelId: string | null;
   modeName: string | null;
 }
+
+interface AssistantData {
+  id: string;
+  name: string;
+  description: string;
+  iconEmoji: string;
+  iconColor: string;
+  systemPrompt: string;
+  modelId: string | null;
+  conversationStarters: string;
+  visibility: string;
+  isActive: boolean;
+}
+
+const ASSISTANT_COLORS: Record<string, string> = {
+  indigo: 'from-indigo-500/20 to-indigo-600/10 border-indigo-500/30',
+  purple: 'from-purple-500/20 to-purple-600/10 border-purple-500/30',
+  blue: 'from-blue-500/20 to-blue-600/10 border-blue-500/30',
+  green: 'from-emerald-500/20 to-emerald-600/10 border-emerald-500/30',
+  orange: 'from-orange-500/20 to-orange-600/10 border-orange-500/30',
+  pink: 'from-pink-500/20 to-pink-600/10 border-pink-500/30',
+  red: 'from-red-500/20 to-red-600/10 border-red-500/30',
+};
 
 export default function ChatPage() {
   const router = useRouter();
@@ -70,6 +93,9 @@ export default function ChatPage() {
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [assistants, setAssistants] = useState<AssistantData[]>([]);
+  const [selectedAssistantId, setSelectedAssistantId] = useState<string | null>(null);
+  const [assistantPickerOpen, setAssistantPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
   const attachmentsRef = useRef<Array<{ name: string; type: string; isImage: boolean; base64Data: string }>>([]);
@@ -81,6 +107,7 @@ export default function ChatPage() {
   const tokenRef = useRef<string>('');
   const selectedModeRef = useRef<string>(selectedMode);
   const currentThreadIdRef = useRef<string | null>(currentThreadId);
+  const selectedAssistantIdRef = useRef<string | null>(selectedAssistantId);
 
   // refを最新の値で更新
   useEffect(() => {
@@ -97,6 +124,10 @@ export default function ChatPage() {
     currentThreadIdRef.current = currentThreadId;
   }, [currentThreadId]);
 
+  useEffect(() => {
+    selectedAssistantIdRef.current = selectedAssistantId;
+  }, [selectedAssistantId]);
+
   // AI SDK v6: DefaultChatTransportを使用（SSE自動パース）
   // bodyを関数にすることで、リクエストごとに最新の値を取得
   const transport = useMemo(
@@ -109,6 +140,7 @@ export default function ChatPage() {
         body: () => ({
           modeId: selectedModeRef.current,  // refから最新のモードIDを取得
           threadId: currentThreadIdRef.current,
+          assistantId: selectedAssistantIdRef.current || undefined,
           attachments: attachmentsRef.current.length > 0 ? attachmentsRef.current : undefined,
         }),
       }),
@@ -280,7 +312,10 @@ export default function ChatPage() {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${tokenRef.current}`,
           },
-          body: JSON.stringify({ title: input.substring(0, 30) || 'New Chat' }),
+          body: JSON.stringify({
+            title: input.substring(0, 30) || 'New Chat',
+            assistantId: selectedAssistantIdRef.current || undefined,
+          }),
         });
         const data = await response.json();
         setCurrentThreadId(data.thread.id);
@@ -334,6 +369,7 @@ export default function ChatPage() {
     setUser(JSON.parse(storedUser));
     loadThreads(storedToken);
     loadModes(storedToken);
+    loadAssistants(storedToken);
   }, [router]);
 
   const loadThreads = async (authToken: string) => {
@@ -371,6 +407,33 @@ export default function ChatPage() {
       console.error('Failed to load modes:', error);
     }
   };
+
+  const loadAssistants = async (authToken: string) => {
+    try {
+      const response = await fetch('/api/assistants', {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAssistants(data.assistants || []);
+      }
+    } catch (error) {
+      console.error('Failed to load assistants:', error);
+    }
+  };
+
+  const selectAssistant = (assistantId: string | null) => {
+    setSelectedAssistantId(assistantId);
+    setAssistantPickerOpen(false);
+    // 新しいチャットを開始
+    if (assistantId !== selectedAssistantId) {
+      setCurrentThreadId(null);
+      setMessages([]);
+      setMessageModels({});
+    }
+  };
+
+  const selectedAssistant = assistants.find(a => a.id === selectedAssistantId) || null;
 
   const createNewThread = () => {
     // 現在のチャットをリセット（次の送信時に自動でスレッドが作成される）
@@ -700,6 +763,81 @@ export default function ChatPage() {
                 モード未設定
               </div>
             )}
+
+            {/* Assistant selector */}
+            {assistants.length > 0 && (
+              <div className="relative">
+                <button
+                  onClick={() => setAssistantPickerOpen(!assistantPickerOpen)}
+                  className={`h-10 px-3 text-sm rounded-xl flex items-center gap-2 transition-all duration-200 border ${
+                    selectedAssistant
+                      ? `bg-gradient-to-r ${ASSISTANT_COLORS[selectedAssistant.iconColor] || ASSISTANT_COLORS.indigo}`
+                      : 'bg-gray-800/60 border-gray-600/50 hover:bg-gray-700/70 text-gray-300'
+                  }`}
+                >
+                  {selectedAssistant ? (
+                    <>
+                      <span className="text-base">{selectedAssistant.iconEmoji}</span>
+                      <span className="max-w-[120px] truncate text-gray-100">{selectedAssistant.name}</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-4 h-4" />
+                      <span>アシスタント</span>
+                    </>
+                  )}
+                  <ChevronDown className="w-3.5 h-3.5 text-gray-400" />
+                </button>
+
+                {/* Dropdown */}
+                {assistantPickerOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setAssistantPickerOpen(false)} />
+                    <div className="absolute top-full mt-2 right-0 z-50 w-72 backdrop-blur-xl bg-gray-900/95 border border-gray-700/50 rounded-xl shadow-2xl p-2 max-h-[400px] overflow-y-auto">
+                      {/* None option */}
+                      <button
+                        onClick={() => selectAssistant(null)}
+                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
+                          !selectedAssistantId ? 'bg-indigo-500/15 border border-indigo-500/30' : 'hover:bg-gray-800/50 border border-transparent'
+                        }`}
+                      >
+                        <div className="w-9 h-9 rounded-lg bg-gray-800/60 border border-gray-700/30 flex items-center justify-center text-sm">
+                          💬
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-100 font-medium">通常チャット</p>
+                          <p className="text-xs text-gray-500">アシスタントなし</p>
+                        </div>
+                      </button>
+
+                      {assistants.length > 0 && (
+                        <div className="h-px bg-gray-800/50 my-1.5" />
+                      )}
+
+                      {assistants.map((assistant) => (
+                        <button
+                          key={assistant.id}
+                          onClick={() => selectAssistant(assistant.id)}
+                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
+                            selectedAssistantId === assistant.id
+                              ? `bg-gradient-to-r ${ASSISTANT_COLORS[assistant.iconColor] || ASSISTANT_COLORS.indigo}`
+                              : 'hover:bg-gray-800/50 border border-transparent'
+                          }`}
+                        >
+                          <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${ASSISTANT_COLORS[assistant.iconColor] || ASSISTANT_COLORS.indigo} flex items-center justify-center text-sm`}>
+                            {assistant.iconEmoji}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm text-gray-100 font-medium truncate">{assistant.name}</p>
+                            <p className="text-xs text-gray-500 truncate">{assistant.description || 'カスタムアシスタント'}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {user?.role === 'OWNER' && (
@@ -719,8 +857,39 @@ export default function ChatPage() {
         <div className="flex-1 px-4">
           <div className="max-w-[800px] mx-auto space-y-6 min-h-full flex flex-col">
             {messages.length === 0 && (
-              <div className="flex-1 flex items-start justify-center pt-[38vh]">
-                <p className="text-[1.35rem] text-gray-400">何を考えていますか？</p>
+              <div className="flex-1 flex flex-col items-center justify-center pt-[20vh]">
+                {selectedAssistant ? (
+                  <>
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${ASSISTANT_COLORS[selectedAssistant.iconColor] || ASSISTANT_COLORS.indigo} flex items-center justify-center text-3xl mb-4 shadow-lg`}>
+                      {selectedAssistant.iconEmoji}
+                    </div>
+                    <h3 className="text-xl font-semibold text-white mb-1">{selectedAssistant.name}</h3>
+                    {selectedAssistant.description && (
+                      <p className="text-sm text-gray-400 mb-6 max-w-md text-center">{selectedAssistant.description}</p>
+                    )}
+                    {(() => {
+                      const starters = JSON.parse(selectedAssistant.conversationStarters || '[]') as string[];
+                      if (starters.length === 0 || !starters[0]) return null;
+                      return (
+                        <div className="flex flex-wrap gap-2 justify-center max-w-lg">
+                          {starters.map((starter, i) => (
+                            <button
+                              key={i}
+                              onClick={() => {
+                                setInput(starter);
+                              }}
+                              className={`px-4 py-2.5 text-sm rounded-xl border bg-gradient-to-r ${ASSISTANT_COLORS[selectedAssistant.iconColor] || ASSISTANT_COLORS.indigo} text-gray-100 hover:scale-[1.03] transition-all duration-200 shadow-md`}
+                            >
+                              {starter}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </>
+                ) : (
+                  <p className="text-[1.35rem] text-gray-400 pt-[18vh]">何を考えていますか？</p>
+                )}
               </div>
             )}
 

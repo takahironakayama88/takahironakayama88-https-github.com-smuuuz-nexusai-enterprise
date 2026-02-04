@@ -33,6 +33,7 @@ model Organization {
 
   users               User[]
   threads             Thread[]
+  assistants          Assistant[]
   auditLogs           AuditLog[]
 
   @@map("organizations")
@@ -48,9 +49,10 @@ model User {
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  threads        Thread[]
-  auditLogs      AuditLog[]
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  threads            Thread[]
+  createdAssistants  Assistant[]  @relation("AssistantCreator")
+  auditLogs          AuditLog[]
 
   @@map("users")
 }
@@ -66,11 +68,13 @@ model Thread {
   title          String       @default("New Chat")
   organizationId String       @map("organization_id")
   userId         String       @map("user_id")
+  assistantId    String?      @map("assistant_id")
   createdAt      DateTime     @default(now()) @map("created_at")
   updatedAt      DateTime     @updatedAt @map("updated_at")
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  assistant      Assistant?   @relation(fields: [assistantId], references: [id], onDelete: SetNull)
   messages       Message[]
 
   @@map("threads")
@@ -96,6 +100,31 @@ enum MessageRole {
   user
   assistant
   system
+}
+
+// カスタムアシスタント
+model Assistant {
+  id                String       @id @default(cuid())
+  organizationId    String       @map("organization_id")
+  name              String
+  description       String       @default("")
+  iconEmoji         String       @default("🤖") @map("icon_emoji")
+  iconColor         String       @default("indigo") @map("icon_color") // indigo, purple, blue, green, orange, pink, red
+  systemPrompt      String       @map("system_prompt")
+  modelId           String?      @map("model_id")  // null = モード設定に従う
+  conversationStarters String    @default("[]") @map("conversation_starters") // JSON配列
+  visibility        String       @default("all") // all, owner_only
+  isActive          Boolean      @default(true) @map("is_active")
+  createdBy         String       @map("created_by")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator           User         @relation("AssistantCreator", fields: [createdBy], references: [id])
+  threads           Thread[]
+
+  @@index([organizationId])
+  @@map("assistants")
 }
 
 // 監査ログ
