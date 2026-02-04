@@ -69,7 +69,9 @@ export default function ChatPage() {
   const [threadToDelete, setThreadToDelete] = useState<Thread | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragCounterRef = useRef(0);
   const attachmentsRef = useRef<Array<{ name: string; type: string; isImage: boolean; base64Data: string }>>([]);
 
   // メッセージごとのモデルIDを記録
@@ -182,6 +184,50 @@ export default function ChatPage() {
 
   const removeAttachedFile = (index: number) => {
     setAttachedFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current++;
+    if (e.dataTransfer.types.includes('Files')) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current--;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current = 0;
+    setIsDragging(false);
+
+    const files = e.dataTransfer.files;
+    if (files && files.length > 0) {
+      const allowedTypes = [
+        'image/jpeg', 'image/png', 'image/gif', 'image/webp',
+        'application/pdf', 'text/plain', 'text/csv',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ];
+      const validFiles = Array.from(files).filter(f => allowedTypes.includes(f.type));
+      if (validFiles.length > 0) {
+        setAttachedFiles(prev => [...prev, ...validFiles]);
+      }
+    }
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -768,9 +814,24 @@ export default function ChatPage() {
         </div>
 
         {/* 入力エリア */}
-        <div className="px-4 pb-6 flex justify-center">
+        <div
+          className="px-4 pb-6 flex justify-center"
+          onDragEnter={handleDragEnter}
+          onDragLeave={handleDragLeave}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
           <form onSubmit={handleSubmit}>
             <div className="relative w-[680px]">
+              {/* ドラッグ＆ドロップオーバーレイ */}
+              {isDragging && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[28px] border-2 border-dashed border-indigo-400/70 bg-indigo-500/10 backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-2">
+                    <Paperclip className="w-8 h-8 text-indigo-400" />
+                    <span className="text-sm text-indigo-300 font-medium">ファイルをドロップして添付</span>
+                  </div>
+                </div>
+              )}
               {/* 添付ファイルプレビュー */}
               {attachedFiles.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-2 px-2">
@@ -784,7 +845,7 @@ export default function ChatPage() {
                       <button
                         type="button"
                         onClick={() => removeAttachedFile(index)}
-                        className="text-gray-400 hover:text-gray-100 transition-colors"
+                        className="bg-transparent border-none p-0 text-gray-500 hover:text-gray-300 transition-colors cursor-pointer"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -804,16 +865,14 @@ export default function ChatPage() {
               />
 
               {/* クリップボタン */}
-              <Button
+              <button
                 type="button"
-                variant="ghost"
-                size="icon"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isLoading || isUploading || modes.length === 0}
-                className="absolute left-[-56px] bottom-[19px] h-10 w-10 rounded-full text-gray-400 hover:text-gray-100 hover:bg-gray-800/50 transition-all duration-200"
+                className="absolute left-[-56px] bottom-[19px] h-10 w-10 flex items-center justify-center bg-transparent border-none text-white hover:opacity-70 disabled:opacity-30 transition-opacity duration-200 cursor-pointer"
               >
-                <Paperclip className="w-5 h-5" />
-              </Button>
+                <Paperclip className="w-6 h-6" />
+              </button>
 
               <Textarea
                 value={input}

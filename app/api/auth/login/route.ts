@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import * as crypto from 'crypto';
 import * as jwt from 'jsonwebtoken';
+import { recordAudit } from '@/lib/utils/audit';
 
 // パスワードハッシュ化（簡易版 - シードスクリプトと同じ）
 function hashPassword(password: string): string {
@@ -65,6 +66,15 @@ export async function POST(request: NextRequest) {
       JWT_SECRET,
       { expiresIn: JWT_EXPIRES_IN }
     );
+
+    // 監査ログ記録
+    await recordAudit({
+      organizationId: user.organizationId,
+      userId: user.id,
+      action: 'login',
+      metadata: { email: user.email },
+      request,
+    });
 
     // レスポンス
     return NextResponse.json({

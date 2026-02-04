@@ -10,6 +10,9 @@ import { prisma } from '@/lib/db/prisma';
 import { getAIModel, calculateCost, type ModelId } from '@/lib/ai/providers';
 import * as jwt from 'jsonwebtoken';
 
+// Route Segment Config: ボディサイズ制限を増加
+export const maxDuration = 60; // 60秒タイムアウト
+
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production';
 
 // JWTペイロードの型定義
@@ -64,15 +67,22 @@ export async function POST(request: NextRequest) {
       // 最後のユーザーメッセージに添付ファイルを追加
       if (msg.role === 'user' && index === rawMessages.length - 1 && attachments && attachments.length > 0) {
         // マルチモーダルコンテンツを構築
-        const contentParts: Array<{ type: 'text'; text: string } | { type: 'image'; image: string }> = [];
+        const contentParts: Array<any> = [];
 
         // 画像添付を追加
         for (const attachment of attachments) {
-          if (attachment.isImage) {
-            contentParts.push({
-              type: 'image',
-              image: attachment.base64Data,
-            });
+          if (attachment.isImage && attachment.base64Data) {
+            // data:image/jpeg;base64,xxx 形式からbase64データのみを抽出
+            const base64Match = attachment.base64Data.match(/^data:([^;]+);base64,(.+)$/);
+            if (base64Match) {
+              const mimeType = base64Match[1];
+              const base64Data = base64Match[2];
+              contentParts.push({
+                type: 'image',
+                image: Buffer.from(base64Data, 'base64'),
+                mimeType: mimeType,
+              });
+            }
           }
         }
 

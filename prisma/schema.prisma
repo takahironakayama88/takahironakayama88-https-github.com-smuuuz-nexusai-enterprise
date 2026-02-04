@@ -33,6 +33,7 @@ model Organization {
 
   users               User[]
   threads             Thread[]
+  auditLogs           AuditLog[]
 
   @@map("organizations")
 }
@@ -49,6 +50,7 @@ model User {
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   threads        Thread[]
+  auditLogs      AuditLog[]
 
   @@map("users")
 }
@@ -94,4 +96,23 @@ enum MessageRole {
   user
   assistant
   system
+}
+
+// 監査ログ
+model AuditLog {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  userId         String   @map("user_id")
+  action         String   // login, api_key_change, mode_change, thread_create, thread_delete
+  metadata       String   @default("{}")  // JSON文字列（SQLiteにはJSON型がないため）
+  ipAddress      String?  @map("ip_address")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
 }

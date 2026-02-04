@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import { encryptApiKey } from '@/lib/utils/encryption';
 import * as jwt from 'jsonwebtoken';
+import { recordAudit } from '@/lib/utils/audit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production';
 
@@ -80,6 +81,14 @@ export async function PUT(request: NextRequest) {
     await prisma.organization.update({
       where: { id: decoded.organizationId },
       data: updateData,
+    });
+
+    await recordAudit({
+      organizationId: decoded.organizationId,
+      userId: decoded.userId,
+      action: 'api_key_change',
+      metadata: { provider },
+      request,
     });
 
     return NextResponse.json({

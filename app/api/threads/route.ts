@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import * as jwt from 'jsonwebtoken';
+import { recordAudit } from '@/lib/utils/audit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production';
 
@@ -82,6 +83,14 @@ export async function POST(request: NextRequest) {
         userId: decoded.userId,
         organizationId: decoded.organizationId,
       },
+    });
+
+    await recordAudit({
+      organizationId: decoded.organizationId,
+      userId: decoded.userId,
+      action: 'thread_create',
+      metadata: { threadId: thread.id, title: thread.title },
+      request,
     });
 
     return NextResponse.json({ thread });

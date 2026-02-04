@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import * as jwt from 'jsonwebtoken';
+import { recordAudit } from '@/lib/utils/audit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production';
 
@@ -149,6 +150,14 @@ export async function DELETE(
     // スレッドを削除（メッセージも cascade で削除される）
     await prisma.thread.delete({
       where: { id },
+    });
+
+    await recordAudit({
+      organizationId: decoded.organizationId,
+      userId: decoded.userId,
+      action: 'thread_delete',
+      metadata: { threadId: id, title: thread.title },
+      request,
     });
 
     return NextResponse.json({ success: true });

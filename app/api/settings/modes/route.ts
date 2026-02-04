@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db/prisma';
 import * as jwt from 'jsonwebtoken';
 import { AI_MODELS, type ModelId } from '@/lib/ai/providers';
+import { recordAudit } from '@/lib/utils/audit';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-jwt-secret-change-in-production';
 
@@ -164,6 +165,14 @@ export async function PUT(request: NextRequest) {
     await prisma.organization.update({
       where: { id: decoded.organizationId },
       data: updateData,
+    });
+
+    await recordAudit({
+      organizationId: decoded.organizationId,
+      userId: decoded.userId,
+      action: 'mode_change',
+      metadata: { fast, balanced, precision },
+      request,
     });
 
     return NextResponse.json({

@@ -19,7 +19,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Scale, Target } from 'lucide-react';
+import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Scale, Target, Settings, Shield } from 'lucide-react';
+import { AuditSection } from '@/components/audit/AuditSection';
 
 interface UserData {
   id: string;
@@ -48,6 +49,7 @@ interface ModeSettings {
 
 type Provider = 'openai' | 'anthropic' | 'google';
 type ModeId = 'fast' | 'balanced' | 'precision';
+type DashboardTab = 'settings' | 'audit';
 
 const PROVIDER_INFO = {
   openai: { name: 'ChatGPT', color: 'from-green-500 to-emerald-600' },
@@ -81,6 +83,7 @@ export default function DashboardPage() {
   const [availableModels, setAvailableModels] = useState<AvailableModel[]>([]);
   const [isSavingModes, setIsSavingModes] = useState(false);
   const [modeMessage, setModeMessage] = useState('');
+  const [dashboardTab, setDashboardTab] = useState<DashboardTab>('settings');
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
@@ -272,7 +275,7 @@ export default function DashboardPage() {
       {/* メインコンテンツ */}
       <main className="relative max-w-6xl mx-auto px-6 py-10">
         {/* ウェルカムセクション */}
-        <div className="mb-10">
+        <div className="mb-8">
           <h2 className="text-3xl font-bold text-white mb-2">
             ようこそ、{user.email.split('@')[0]}さん
           </h2>
@@ -281,6 +284,37 @@ export default function DashboardPage() {
           </p>
         </div>
 
+        {/* タブナビゲーション */}
+        {user.role === 'OWNER' && (
+          <div className="flex gap-1 p-1 mb-8 backdrop-blur-xl bg-gray-800/40 rounded-lg border border-gray-700/30 w-fit">
+            <button
+              onClick={() => setDashboardTab('settings')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                dashboardTab === 'settings'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+              }`}
+            >
+              <Settings className="w-4 h-4" />
+              設定
+            </button>
+            <button
+              onClick={() => setDashboardTab('audit')}
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
+                dashboardTab === 'audit'
+                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+              }`}
+            >
+              <Shield className="w-4 h-4" />
+              監査ログ
+            </button>
+          </div>
+        )}
+
+        {/* 設定タブ */}
+        {dashboardTab === 'settings' && (
+        <>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* ユーザー情報カード */}
           <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
@@ -534,6 +568,15 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
+        </>
+        )}
+
+        {/* 監査ログタブ */}
+        {dashboardTab === 'audit' && user.role === 'OWNER' && (
+          <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
+            <AuditSection token={token} />
+          </div>
+        )}
       </main>
 
       {/* APIキー設定ダイアログ */}
