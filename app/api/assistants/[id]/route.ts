@@ -28,6 +28,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       },
       include: {
         creator: { select: { email: true } },
+        category: { select: { id: true, name: true, displayOrder: true } },
       },
     });
 
@@ -63,7 +64,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
     }
 
     const body = await request.json();
-    const { name, description, iconEmoji, iconColor, systemPrompt, modelId, conversationStarters, visibility, isActive } = body;
+    const { name, description, iconEmoji, iconColor, systemPrompt, modelId, conversationStarters, visibility, isActive, categoryId } = body;
 
     const updateData: Record<string, unknown> = {};
     if (name !== undefined) updateData.name = name.trim();
@@ -75,12 +76,24 @@ export async function PUT(request: NextRequest, { params }: Params) {
     if (conversationStarters !== undefined) updateData.conversationStarters = JSON.stringify(conversationStarters);
     if (visibility !== undefined) updateData.visibility = visibility;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (categoryId !== undefined) {
+      if (categoryId) {
+        const cat = await prisma.assistantCategory.findFirst({
+          where: { id: categoryId, organizationId: decoded.organizationId },
+        });
+        if (!cat) {
+          return NextResponse.json({ error: '指定されたカテゴリが見つかりません' }, { status: 400 });
+        }
+      }
+      updateData.categoryId = categoryId || null;
+    }
 
     const assistant = await prisma.assistant.update({
       where: { id },
       data: updateData,
       include: {
         creator: { select: { email: true } },
+        category: { select: { id: true, name: true, displayOrder: true } },
       },
     });
 

@@ -102,6 +102,68 @@ export async function PUT(request: NextRequest) {
   }
 }
 
+// APIキーを解除
+export async function DELETE(request: NextRequest) {
+  const decoded = verifyAuth(request);
+  if (!decoded) {
+    return NextResponse.json({ error: '認証が必要です' }, { status: 401 });
+  }
+
+  if (decoded.role !== 'OWNER') {
+    return NextResponse.json(
+      { error: 'APIキーの解除にはOWNER権限が必要です' },
+      { status: 403 }
+    );
+  }
+
+  try {
+    const { searchParams } = new URL(request.url);
+    const provider = searchParams.get('provider') as 'openai' | 'anthropic' | 'google' | null;
+
+    if (!provider || !['openai', 'anthropic', 'google'].includes(provider)) {
+      return NextResponse.json(
+        { error: '有効なproviderを指定してください' },
+        { status: 400 }
+      );
+    }
+
+    const updateData: Record<string, null> = {};
+    switch (provider) {
+      case 'openai':
+        updateData.encOpenaiKey = null;
+        break;
+      case 'anthropic':
+        updateData.encAnthropicKey = null;
+        break;
+      case 'google':
+        updateData.encGoogleKey = null;
+        break;
+    }
+
+    await prisma.organization.update({
+      where: { id: decoded.organizationId },
+      data: updateData,
+    });
+
+    await recordAudit({
+      organizationId: decoded.organizationId,
+      userId: decoded.userId,
+      action: 'api_key_change',
+      metadata: { provider, operation: 'disconnect' },
+      request,
+    });
+
+    return NextResponse.json({
+      success: true,
+      message: `${provider}のAPIキーを解除しました`,
+    });
+  } catch (error) {
+    console.error('API key disconnect error:', error);
+    const errorMessage = error instanceof Error ? error.message : 'APIキー解除中にエラーが発生しました';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
+  }
+}
+
 // APIキーの状態を取得
 export async function GET(request: NextRequest) {
   const decoded = verifyAuth(request);

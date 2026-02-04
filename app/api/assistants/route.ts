@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         creator: { select: { email: true } },
+        category: { select: { id: true, name: true, displayOrder: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -45,13 +46,23 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { name, description, iconEmoji, iconColor, systemPrompt, modelId, conversationStarters, visibility } = body;
+    const { name, description, iconEmoji, iconColor, systemPrompt, modelId, conversationStarters, visibility, categoryId } = body;
 
     if (!name || !name.trim()) {
       return NextResponse.json({ error: 'アシスタント名は必須です' }, { status: 400 });
     }
     if (!systemPrompt || !systemPrompt.trim()) {
       return NextResponse.json({ error: 'システムプロンプトは必須です' }, { status: 400 });
+    }
+
+    // categoryIdが指定されている場合、組織所属を検証
+    if (categoryId) {
+      const cat = await prisma.assistantCategory.findFirst({
+        where: { id: categoryId, organizationId: decoded.organizationId },
+      });
+      if (!cat) {
+        return NextResponse.json({ error: '指定されたカテゴリが見つかりません' }, { status: 400 });
+      }
     }
 
     const assistant = await prisma.assistant.create({
@@ -66,9 +77,11 @@ export async function POST(request: NextRequest) {
         conversationStarters: JSON.stringify(conversationStarters || []),
         visibility: visibility || 'all',
         createdBy: decoded.userId,
+        categoryId: categoryId || null,
       },
       include: {
         creator: { select: { email: true } },
+        category: { select: { id: true, name: true, displayOrder: true } },
       },
     });
 

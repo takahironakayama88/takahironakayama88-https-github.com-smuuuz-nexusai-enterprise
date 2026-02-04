@@ -34,6 +34,7 @@ model Organization {
   users               User[]
   threads             Thread[]
   assistants          Assistant[]
+  assistantCategories AssistantCategory[]
   auditLogs           AuditLog[]
 
   @@map("organizations")
@@ -102,10 +103,28 @@ enum MessageRole {
   system
 }
 
+// アシスタントカテゴリ（組織単位）
+model AssistantCategory {
+  id             String   @id @default(cuid())
+  organizationId String   @map("organization_id")
+  name           String
+  displayOrder   Int      @default(0) @map("display_order")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assistants     Assistant[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+  @@map("assistant_categories")
+}
+
 // カスタムアシスタント
 model Assistant {
   id                String       @id @default(cuid())
   organizationId    String       @map("organization_id")
+  categoryId        String?      @map("category_id")
   name              String
   description       String       @default("")
   iconEmoji         String       @default("🤖") @map("icon_emoji")
@@ -120,6 +139,7 @@ model Assistant {
   updatedAt         DateTime     @updatedAt @map("updated_at")
 
   organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  category          AssistantCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   creator           User         @relation("AssistantCreator", fields: [createdBy], references: [id])
   threads           Thread[]
 

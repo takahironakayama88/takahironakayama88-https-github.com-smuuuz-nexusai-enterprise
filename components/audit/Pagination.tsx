@@ -29,7 +29,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         size="sm"
         onClick={() => onPageChange(page - 1)}
         disabled={page <= 1}
-        className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-800/50"
+        className="h-8 w-8 p-0 bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-40"
       >
         <ChevronLeft className="w-4 h-4" />
       </Button>
@@ -87,7 +87,7 @@ export function Pagination({ page, totalPages, onPageChange }: PaginationProps) 
         size="sm"
         onClick={() => onPageChange(page + 1)}
         disabled={page >= totalPages}
-        className="h-8 w-8 p-0 text-gray-400 hover:text-white hover:bg-gray-800/50"
+        className="h-8 w-8 p-0 bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200 disabled:opacity-40"
       >
         <ChevronRight className="w-4 h-4" />
       </Button>

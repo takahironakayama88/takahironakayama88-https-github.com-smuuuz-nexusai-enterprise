@@ -33,8 +33,8 @@ export function AuditSection({ token }: AuditSectionProps) {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
                 activeTab === tab.id
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+                  ? 'bg-black text-white border border-gray-600/50'
+                  : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
               }`}
             >
               <Icon className="w-3.5 h-3.5" />

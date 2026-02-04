@@ -11,7 +11,13 @@ export type AuditAction =
   | 'api_key_change'
   | 'mode_change'
   | 'thread_create'
-  | 'thread_delete';
+  | 'thread_delete'
+  | 'assistant_create'
+  | 'assistant_update'
+  | 'assistant_delete'
+  | 'category_create'
+  | 'category_update'
+  | 'category_delete';
 
 interface RecordAuditParams {
   organizationId: string;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Scale, Target, Settings, Shield, Bot } from 'lucide-react';
+import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Settings, Shield, Bot } from 'lucide-react';
 import { AuditSection } from '@/components/audit/AuditSection';
 import { AssistantManagementSection } from '@/components/assistants/AssistantManagementSection';
 
@@ -85,6 +85,16 @@ export default function DashboardPage() {
   const [isSavingModes, setIsSavingModes] = useState(false);
   const [modeMessage, setModeMessage] = useState('');
   const [dashboardTab, setDashboardTab] = useState<DashboardTab>('settings');
+  const assistantSectionRef = useRef<HTMLDivElement>(null);
+  const tabNavRef = useRef<HTMLDivElement>(null);
+
+  const handleMainClick = useCallback((e: React.MouseEvent) => {
+    if (dashboardTab !== 'assistants') return;
+    const target = e.target as Node;
+    if (assistantSectionRef.current?.contains(target)) return;
+    if (tabNavRef.current?.contains(target)) return;
+    setDashboardTab('settings');
+  }, [dashboardTab]);
 
   useEffect(() => {
     const storedToken = localStorage.getItem('token');
@@ -226,6 +236,22 @@ export default function DashboardPage() {
     }
   };
 
+  const handleDisconnect = async (provider: Provider) => {
+    if (!confirm(`${PROVIDER_INFO[provider].name}のAPIキーを解除しますか？`)) return;
+    try {
+      const response = await fetch(`/api/settings/api-keys?provider=${provider}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        await loadApiKeyStatus(token);
+        await loadModeSettings(token);
+      }
+    } catch (error) {
+      console.error('API key disconnect failed:', error);
+    }
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
@@ -265,7 +291,7 @@ export default function DashboardPage() {
           <Button
             variant="ghost"
             onClick={handleLogout}
-            className="text-gray-400 hover:text-white hover:bg-gray-800/50"
+            className="bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
           >
             <LogOut className="w-4 h-4 mr-2" />
             ログアウト
@@ -274,7 +300,7 @@ export default function DashboardPage() {
       </header>
 
       {/* メインコンテンツ */}
-      <main className="relative max-w-6xl mx-auto px-6 py-10">
+      <main className="relative max-w-6xl mx-auto px-6 py-10" onClick={handleMainClick}>
         {/* ウェルカムセクション */}
         <div className="mb-8">
           <h2 className="text-3xl font-bold text-white mb-2">
@@ -287,13 +313,13 @@ export default function DashboardPage() {
 
         {/* タブナビゲーション */}
         {user.role === 'OWNER' && (
-          <div className="flex gap-1 p-1 mb-8 backdrop-blur-xl bg-gray-800/40 rounded-lg border border-gray-700/30 w-fit">
+          <div ref={tabNavRef} className="flex gap-1 p-1 mb-8 backdrop-blur-xl bg-gray-800/40 rounded-lg border border-gray-700/30 w-fit">
             <button
               onClick={() => setDashboardTab('settings')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
                 dashboardTab === 'settings'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+                  ? 'bg-black text-white border border-gray-600/50'
+                  : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
               }`}
             >
               <Settings className="w-4 h-4" />
@@ -303,8 +329,8 @@ export default function DashboardPage() {
               onClick={() => setDashboardTab('assistants')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
                 dashboardTab === 'assistants'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+                  ? 'bg-black text-white border border-gray-600/50'
+                  : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
               }`}
             >
               <Bot className="w-4 h-4" />
@@ -314,8 +340,8 @@ export default function DashboardPage() {
               onClick={() => setDashboardTab('audit')}
               className={`flex items-center gap-2 px-5 py-2.5 rounded-md text-sm font-medium transition-all duration-200 ${
                 dashboardTab === 'audit'
-                  ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
-                  : 'text-gray-400 hover:text-gray-200 hover:bg-gray-700/30'
+                  ? 'bg-black text-white border border-gray-600/50'
+                  : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
               }`}
             >
               <Shield className="w-4 h-4" />
@@ -378,25 +404,36 @@ export default function DashboardPage() {
             <div className="space-y-3">
               {(['openai', 'anthropic', 'google'] as Provider[]).map((provider) => (
                 <div key={provider} className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-2 h-2 rounded-full ${
-                      apiKeyStatus[provider] ? 'bg-green-500' : 'bg-gray-600'
-                    }`} />
+                  <div className="flex items-center gap-3">
                     <span className="text-sm text-gray-300">{PROVIDER_INFO[provider].name}</span>
+                    {apiKeyStatus[provider] ? (
+                      <span className="text-[11px] text-green-400 font-medium">接続中</span>
+                    ) : (
+                      <span className="text-[11px] text-gray-500">未設定</span>
+                    )}
                   </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleOpenDialog(provider)}
-                    disabled={user.role !== 'OWNER'}
-                    className={`h-7 text-xs ${
-                      apiKeyStatus[provider]
-                        ? 'text-gray-400 hover:text-white hover:bg-gray-800/50'
-                        : 'text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10'
-                    }`}
-                  >
-                    {apiKeyStatus[provider] ? '更新' : '設定'}
-                  </Button>
+                  <div className="flex items-center gap-1.5">
+                    {apiKeyStatus[provider] && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => handleDisconnect(provider)}
+                        disabled={user.role !== 'OWNER'}
+                        className="h-7 text-xs text-red-400 hover:bg-red-500/10 hover:text-red-400 transition-all duration-200"
+                      >
+                        解除
+                      </Button>
+                    )}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleOpenDialog(provider)}
+                      disabled={user.role !== 'OWNER'}
+                      className="h-7 text-xs bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
+                    >
+                      {apiKeyStatus[provider] ? '更新' : '設定'}
+                    </Button>
+                  </div>
                 </div>
               ))}
               {user.role !== 'OWNER' && (
@@ -427,10 +464,7 @@ export default function DashboardPage() {
               <div className="space-y-4">
                 {/* 高速モード */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-3.5 h-3.5 text-yellow-500" />
-                    <Label className="text-sm text-gray-300">高速モード</Label>
-                  </div>
+                  <Label className="text-sm text-gray-300">高速モード</Label>
                   <Select
                     value={modeSettings.fast || 'none'}
                     onValueChange={(v) => handleModeChange('fast', v)}
@@ -452,10 +486,7 @@ export default function DashboardPage() {
 
                 {/* バランスモード */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Scale className="w-3.5 h-3.5 text-blue-500" />
-                    <Label className="text-sm text-gray-300">バランスモード</Label>
-                  </div>
+                  <Label className="text-sm text-gray-300">バランスモード</Label>
                   <Select
                     value={modeSettings.balanced || 'none'}
                     onValueChange={(v) => handleModeChange('balanced', v)}
@@ -477,10 +508,7 @@ export default function DashboardPage() {
 
                 {/* 高精度モード */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center gap-2">
-                    <Target className="w-3.5 h-3.5 text-purple-500" />
-                    <Label className="text-sm text-gray-300">高精度モード</Label>
-                  </div>
+                  <Label className="text-sm text-gray-300">高精度モード</Label>
                   <Select
                     value={modeSettings.precision || 'none'}
                     onValueChange={(v) => handleModeChange('precision', v)}
@@ -506,7 +534,7 @@ export default function DashboardPage() {
                       size="sm"
                       onClick={saveModeSettings}
                       disabled={isSavingModes}
-                      className="w-full h-9 text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 rounded-lg"
+                      className="w-full h-9 text-sm bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200 rounded-lg"
                     >
                       {isSavingModes ? (
                         <>
@@ -554,38 +582,19 @@ export default function DashboardPage() {
             </p>
             <Button
               onClick={() => router.push('/chat')}
-              className="w-full h-11 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium shadow-lg shadow-indigo-500/25 transition-all duration-200"
+              className="w-full h-11 rounded-xl bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black font-medium transition-all duration-200"
             >
               チャットを開始
             </Button>
           </div>
         </div>
 
-        {/* APIキーステータスバー */}
-        <div className="mt-8 backdrop-blur-xl bg-gray-900/40 border border-gray-800/50 rounded-xl p-4">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm text-gray-400">API接続状況</span>
-            <span className="text-sm text-gray-500">{configuredCount}/3</span>
-          </div>
-          <div className="flex gap-2">
-            {(['openai', 'anthropic', 'google'] as Provider[]).map((provider) => (
-              <div
-                key={provider}
-                className={`flex-1 h-2 rounded-full transition-all duration-300 ${
-                  apiKeyStatus[provider]
-                    ? `bg-gradient-to-r ${PROVIDER_INFO[provider].color}`
-                    : 'bg-gray-800'
-                }`}
-              />
-            ))}
-          </div>
-        </div>
         </>
         )}
 
         {/* アシスタントタブ */}
         {dashboardTab === 'assistants' && user.role === 'OWNER' && (
-          <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
+          <div ref={assistantSectionRef} className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
             <AssistantManagementSection token={token} />
           </div>
         )}

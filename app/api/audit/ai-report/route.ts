@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
                 { role: 'user', content: serialized },
               ],
               async onFinish({ usage }) {
-                totalTokensUsed += (usage.promptTokens || 0) + (usage.completionTokens || 0);
+                totalTokensUsed += (usage.inputTokens || 0) + (usage.outputTokens || 0);
               },
             });
 
@@ -309,7 +309,7 @@ export async function POST(request: NextRequest) {
                 ],
               });
 
-              totalTokensUsed += (usage.promptTokens || 0) + (usage.completionTokens || 0);
+              totalTokensUsed += (usage.inputTokens || 0) + (usage.outputTokens || 0);
               intermediateResults.push(
                 `--- チャンク ${i + 1}/${chunks.length} の分析結果（${chunkThreadCount}スレッド、${chunkMsgCount}メッセージ）---\n${text}`
               );
@@ -328,7 +328,7 @@ export async function POST(request: NextRequest) {
                 { role: 'user', content: combinedAnalysis },
               ],
               async onFinish({ usage }) {
-                totalTokensUsed += (usage.promptTokens || 0) + (usage.completionTokens || 0);
+                totalTokensUsed += (usage.inputTokens || 0) + (usage.outputTokens || 0);
               },
             });
 

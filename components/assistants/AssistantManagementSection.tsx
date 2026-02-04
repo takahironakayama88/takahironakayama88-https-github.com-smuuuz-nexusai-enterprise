@@ -18,7 +18,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Sparkles, MessageSquare, Copy, Check } from 'lucide-react';
+import { Plus, Pencil, Trash2, Loader2, Eye, EyeOff, Sparkles, MessageSquare, Copy, Check, FolderOpen, Tag } from 'lucide-react';
+
+interface AssistantCategory {
+  id: string;
+  name: string;
+  displayOrder: number;
+  _count: { assistants: number };
+}
 
 interface Assistant {
   id: string;
@@ -34,6 +41,8 @@ interface Assistant {
   createdBy: string;
   createdAt: string;
   creator: { email: string };
+  categoryId: string | null;
+  category: { id: string; name: string; displayOrder: number } | null;
 }
 
 interface AssistantManagementSectionProps {
@@ -61,10 +70,12 @@ const DEFAULT_FORM = {
   modelId: '',
   conversationStarters: [''],
   visibility: 'all',
+  categoryId: '',
 };
 
 export function AssistantManagementSection({ token }: AssistantManagementSectionProps) {
   const [assistants, setAssistants] = useState<Assistant[]>([]);
+  const [categories, setCategories] = useState<AssistantCategory[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -74,10 +85,19 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
   const [error, setError] = useState('');
   const [copiedPrompt, setCopiedPrompt] = useState<string | null>(null);
 
+  // Category management state
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
+  const [categorySaving, setCategorySaving] = useState(false);
+
   const [form, setForm] = useState(DEFAULT_FORM);
 
   useEffect(() => {
     loadAssistants();
+    loadCategories();
   }, [token]);
 
   const loadAssistants = async () => {
@@ -93,6 +113,20 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
       console.error('Failed to load assistants:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadCategories = async () => {
+    try {
+      const res = await fetch('/api/assistant-categories', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCategories(data.categories);
+      }
+    } catch (err) {
+      console.error('Failed to load categories:', err);
     }
   };
 
@@ -115,6 +149,7 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
       modelId: assistant.modelId || '',
       conversationStarters: starters.length > 0 ? starters : [''],
       visibility: assistant.visibility,
+      categoryId: assistant.categoryId || '',
     });
     setError('');
     setDialogOpen(true);
@@ -137,6 +172,7 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
       ...form,
       modelId: form.modelId || null,
       conversationStarters: form.conversationStarters.filter(s => s.trim()),
+      categoryId: form.categoryId || null,
     };
 
     try {
@@ -225,7 +261,219 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
     }));
   };
 
+  // Category CRUD handlers
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return;
+    setCategorySaving(true);
+    setCategoryError('');
+
+    try {
+      const res = await fetch('/api/assistant-categories', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: newCategoryName.trim() }),
+      });
+
+      if (res.ok) {
+        setNewCategoryName('');
+        await loadCategories();
+      } else {
+        const data = await res.json();
+        setCategoryError(data.error || 'カテゴリの作成に失敗しました');
+      }
+    } catch {
+      setCategoryError('カテゴリの作成に失敗しました');
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const handleUpdateCategory = async (id: string) => {
+    if (!editingCategoryName.trim()) return;
+    setCategorySaving(true);
+    setCategoryError('');
+
+    try {
+      const res = await fetch(`/api/assistant-categories/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ name: editingCategoryName.trim() }),
+      });
+
+      if (res.ok) {
+        setEditingCategoryId(null);
+        setEditingCategoryName('');
+        await Promise.all([loadCategories(), loadAssistants()]);
+      } else {
+        const data = await res.json();
+        setCategoryError(data.error || 'カテゴリの更新に失敗しました');
+      }
+    } catch {
+      setCategoryError('カテゴリの更新に失敗しました');
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    setCategorySaving(true);
+    setCategoryError('');
+
+    try {
+      const res = await fetch(`/api/assistant-categories/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.ok) {
+        await Promise.all([loadCategories(), loadAssistants()]);
+      } else {
+        const data = await res.json();
+        setCategoryError(data.error || 'カテゴリの削除に失敗しました');
+      }
+    } catch {
+      setCategoryError('カテゴリの削除に失敗しました');
+    } finally {
+      setCategorySaving(false);
+    }
+  };
+
   const colorStyle = (color: string) => ICON_COLORS[color] || ICON_COLORS.indigo;
+
+  // Group assistants by category
+  const groupedAssistants = (() => {
+    const groups: { category: AssistantCategory | null; assistants: Assistant[] }[] = [];
+
+    // Sorted categories by displayOrder
+    const sortedCategories = [...categories].sort((a, b) => a.displayOrder - b.displayOrder);
+
+    for (const cat of sortedCategories) {
+      const catAssistants = assistants.filter(a => a.categoryId === cat.id);
+      if (catAssistants.length > 0) {
+        groups.push({ category: cat, assistants: catAssistants });
+      }
+    }
+
+    // Uncategorized
+    const uncategorized = assistants.filter(a => !a.categoryId);
+    if (uncategorized.length > 0) {
+      groups.push({ category: null, assistants: uncategorized });
+    }
+
+    return groups;
+  })();
+
+  const renderAssistantCard = (assistant: Assistant) => {
+    const cs = colorStyle(assistant.iconColor);
+    const starters = JSON.parse(assistant.conversationStarters || '[]') as string[];
+
+    return (
+      <div
+        key={assistant.id}
+        style={{ maxHeight: '147px' }}
+        className={`group relative backdrop-blur-xl bg-gray-900/60 border rounded-xl px-4 py-3 shadow-lg transition-all duration-200 hover:shadow-xl hover:scale-[1.01] overflow-hidden ${
+          assistant.isActive
+            ? `border-gray-700/50 hover:${cs.border}`
+            : 'border-gray-800/30 opacity-60'
+        }`}
+      >
+        {/* Header row */}
+        <div className="flex items-center gap-2.5 mb-1.5">
+          <div className={`w-8 h-8 rounded-lg ${cs.bg} border ${cs.border} flex items-center justify-center text-sm shrink-0`}>
+            {assistant.iconEmoji}
+          </div>
+          <div className="flex-1 min-w-0 pr-16">
+            <h4 className="text-white font-semibold text-[13px] leading-tight truncate">{assistant.name}</h4>
+            <p className="text-[11px] text-gray-500 truncate leading-none mt-0.5">{assistant.description || 'カスタムアシスタント'}</p>
+          </div>
+        </div>
+
+        {/* System prompt preview (1 line) */}
+        <div className="mb-1.5 relative group/prompt">
+          <div className="text-[11px] text-gray-400 bg-gray-800/40 rounded-md px-2 py-1 truncate border border-gray-700/20 leading-snug">
+            {assistant.systemPrompt}
+          </div>
+          <button
+            onClick={() => handleCopyPrompt(assistant.systemPrompt, assistant.id)}
+            className="absolute top-0.5 right-0.5 p-0.5 rounded bg-gray-700/60 opacity-0 group-hover/prompt:opacity-100 transition-opacity"
+          >
+            {copiedPrompt === assistant.id
+              ? <Check className="w-2.5 h-2.5 text-green-400" />
+              : <Copy className="w-2.5 h-2.5 text-gray-400" />
+            }
+          </button>
+        </div>
+
+        {/* Conversation starters (inline) */}
+        {starters.length > 0 && starters[0] && (
+          <div className="flex gap-1 mb-1.5 overflow-hidden" style={{ maxHeight: '18px' }}>
+            {starters.slice(0, 2).map((starter, i) => (
+              <span
+                key={i}
+                className={`text-[10px] px-1.5 py-px rounded-full ${cs.bg} ${cs.text} border ${cs.border} truncate max-w-[120px] shrink-0`}
+              >
+                {starter}
+              </span>
+            ))}
+            {starters.length > 2 && (
+              <span className="text-[10px] text-gray-500 shrink-0">+{starters.length - 2}</span>
+            )}
+          </div>
+        )}
+
+        {/* Meta info */}
+        <div className="flex items-center justify-between text-[10px] text-gray-600 pt-1.5 border-t border-gray-800/50">
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-0.5">
+              {assistant.visibility === 'all'
+                ? <><Eye className="w-2.5 h-2.5" /> 全員</>
+                : <><EyeOff className="w-2.5 h-2.5" /> 管理者のみ</>
+              }
+            </span>
+            {assistant.modelId && (
+              <span className="text-gray-500 truncate max-w-[80px]">{assistant.modelId}</span>
+            )}
+          </div>
+          <span>{new Date(assistant.createdAt).toLocaleDateString('ja-JP')}</span>
+        </div>
+
+        {/* Action buttons */}
+        <div className="absolute top-2.5 right-3 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          <button
+            onClick={() => toggleActive(assistant)}
+            className={`p-1 rounded-md transition-colors ${
+              assistant.isActive
+                ? 'hover:bg-yellow-500/10 text-gray-400 hover:text-yellow-400'
+                : 'hover:bg-green-500/10 text-gray-500 hover:text-green-400'
+            }`}
+            title={assistant.isActive ? '無効にする' : '有効にする'}
+          >
+            {assistant.isActive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+          </button>
+          <button
+            onClick={() => openEditDialog(assistant)}
+            className="p-1 rounded-md hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors"
+            title="編集"
+          >
+            <Pencil className="w-3 h-3" />
+          </button>
+          <button
+            onClick={() => { setAssistantToDelete(assistant); setDeleteDialogOpen(true); }}
+            className="p-1 rounded-md hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+            title="削除"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -243,16 +491,26 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
           <h3 className="text-lg font-semibold text-white">カスタムアシスタント</h3>
           <p className="text-sm text-gray-500 mt-0.5">社内向けAIアシスタントを作成・管理</p>
         </div>
-        <Button
-          onClick={openCreateDialog}
-          className="h-10 px-4 text-sm bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-xl shadow-lg shadow-indigo-500/20 transition-all duration-200"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          新規作成
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => { setCategoryError(''); setCategoryDialogOpen(true); }}
+            variant="ghost"
+            className="h-10 px-4 text-sm text-gray-300 hover:text-white bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 rounded-xl transition-all duration-200"
+          >
+            <Tag className="w-4 h-4 mr-2" />
+            カテゴリ管理
+          </Button>
+          <Button
+            onClick={openCreateDialog}
+            className="h-10 px-4 text-sm bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black rounded-xl transition-all duration-200"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            新規作成
+          </Button>
+        </div>
       </div>
 
-      {/* Assistant cards grid */}
+      {/* Assistant cards grouped by category */}
       {assistants.length === 0 ? (
         <div className="text-center py-20">
           <div className="w-16 h-16 rounded-2xl bg-gray-800/60 border border-gray-700/30 flex items-center justify-center mx-auto mb-4">
@@ -261,116 +519,154 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
           <p className="text-gray-500 text-sm mb-1">アシスタントがまだありません</p>
           <p className="text-gray-600 text-xs">「新規作成」で社内向けAIアシスタントを追加しましょう</p>
         </div>
-      ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {assistants.map((assistant) => {
-            const cs = colorStyle(assistant.iconColor);
-            const starters = JSON.parse(assistant.conversationStarters || '[]') as string[];
-
-            return (
-              <div
-                key={assistant.id}
-                className={`group relative backdrop-blur-xl bg-gray-900/60 border rounded-2xl p-5 shadow-xl transition-all duration-300 hover:shadow-2xl hover:scale-[1.01] ${
-                  assistant.isActive
-                    ? `border-gray-700/50 hover:${cs.border}`
-                    : 'border-gray-800/30 opacity-60'
-                }`}
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-11 h-11 rounded-xl ${cs.bg} border ${cs.border} flex items-center justify-center text-lg shadow-lg`}>
-                      {assistant.iconEmoji}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-white font-semibold text-sm truncate">{assistant.name}</h4>
-                      <p className="text-xs text-gray-500 truncate">{assistant.description || 'カスタムアシスタント'}</p>
-                    </div>
-                  </div>
+      ) : groupedAssistants.length > 0 ? (
+        <div className="space-y-6">
+          {groupedAssistants.map((group, groupIndex) => (
+            <div key={group.category?.id || 'uncategorized'}>
+              {/* Category section header */}
+              <div className="flex items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  {group.category ? (
+                    <Tag className="w-3.5 h-3.5 text-indigo-400" />
+                  ) : (
+                    <FolderOpen className="w-3.5 h-3.5 text-gray-500" />
+                  )}
+                  <span className={`text-sm font-medium ${group.category ? 'text-gray-200' : 'text-gray-500'}`}>
+                    {group.category?.name || '未分類'}
+                  </span>
                 </div>
-
-                {/* System prompt preview */}
-                <div className="mb-3 relative group/prompt">
-                  <div className="text-xs text-gray-400 bg-gray-800/40 rounded-lg px-3 py-2 line-clamp-2 border border-gray-700/20">
-                    {assistant.systemPrompt}
-                  </div>
-                  <button
-                    onClick={() => handleCopyPrompt(assistant.systemPrompt, assistant.id)}
-                    className="absolute top-1.5 right-1.5 p-1 rounded bg-gray-700/60 opacity-0 group-hover/prompt:opacity-100 transition-opacity"
-                  >
-                    {copiedPrompt === assistant.id
-                      ? <Check className="w-3 h-3 text-green-400" />
-                      : <Copy className="w-3 h-3 text-gray-400" />
-                    }
-                  </button>
-                </div>
-
-                {/* Conversation starters */}
-                {starters.length > 0 && starters[0] && (
-                  <div className="flex flex-wrap gap-1.5 mb-3">
-                    {starters.slice(0, 3).map((starter, i) => (
-                      <span
-                        key={i}
-                        className={`text-xs px-2 py-0.5 rounded-full ${cs.bg} ${cs.text} border ${cs.border} truncate max-w-[140px]`}
-                      >
-                        {starter}
-                      </span>
-                    ))}
-                    {starters.length > 3 && (
-                      <span className="text-xs text-gray-500">+{starters.length - 3}</span>
-                    )}
-                  </div>
+                <span className="text-[11px] text-gray-600 bg-gray-800/50 px-2 py-0.5 rounded-full">
+                  {group.assistants.length}
+                </span>
+                {groupIndex < groupedAssistants.length - 1 && (
+                  <div className="flex-1 h-px bg-gray-800/50 ml-2" />
                 )}
-
-                {/* Meta info */}
-                <div className="flex items-center justify-between text-xs text-gray-600 pt-3 border-t border-gray-800/50">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1">
-                      {assistant.visibility === 'all'
-                        ? <><Eye className="w-3 h-3" /> 全員</>
-                        : <><EyeOff className="w-3 h-3" /> 管理者のみ</>
-                      }
-                    </span>
-                    {assistant.modelId && (
-                      <span className="text-gray-500">{assistant.modelId}</span>
-                    )}
-                  </div>
-                  <span>{new Date(assistant.createdAt).toLocaleDateString('ja-JP')}</span>
-                </div>
-
-                {/* Action buttons */}
-                <div className="absolute top-4 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => toggleActive(assistant)}
-                    className={`p-1.5 rounded-lg transition-colors ${
-                      assistant.isActive
-                        ? 'hover:bg-yellow-500/10 text-gray-400 hover:text-yellow-400'
-                        : 'hover:bg-green-500/10 text-gray-500 hover:text-green-400'
-                    }`}
-                    title={assistant.isActive ? '無効にする' : '有効にする'}
-                  >
-                    {assistant.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                  </button>
-                  <button
-                    onClick={() => openEditDialog(assistant)}
-                    className="p-1.5 rounded-lg hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors"
-                    title="編集"
-                  >
-                    <Pencil className="w-3.5 h-3.5" />
-                  </button>
-                  <button
-                    onClick={() => { setAssistantToDelete(assistant); setDeleteDialogOpen(true); }}
-                    className="p-1.5 rounded-lg hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
-                    title="削除"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
               </div>
-            );
-          })}
+
+              {/* Cards grid */}
+              <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, 330px)' }}>
+                {group.assistants.map(renderAssistantCard)}
+              </div>
+            </div>
+          ))}
         </div>
-      )}
+      ) : null}
+
+      {/* Category management dialog */}
+      <Dialog open={categoryDialogOpen} onOpenChange={setCategoryDialogOpen}>
+        <DialogContent className="max-w-md p-0 bg-transparent border-none shadow-none">
+          <div className="backdrop-blur-xl bg-gray-900/95 border border-gray-700/50 rounded-2xl shadow-2xl max-h-[70vh] overflow-y-auto">
+            <div className="sticky top-0 z-10 backdrop-blur-xl bg-gray-900/95 px-6 pt-6 pb-4 border-b border-gray-800/50 rounded-t-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Tag className="w-5 h-5 text-indigo-400" />
+                  カテゴリ管理
+                </DialogTitle>
+                <DialogDescription className="text-xs text-gray-400">
+                  アシスタントを分類するカテゴリを管理します
+                </DialogDescription>
+              </DialogHeader>
+            </div>
+
+            <div className="px-6 py-4 space-y-4">
+              {/* New category input */}
+              <div className="flex gap-2">
+                <Input
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="新しいカテゴリ名（例: 人事部）"
+                  className="h-9 text-sm bg-gray-800/60 border-gray-600/50 text-gray-100 placeholder:text-gray-500 rounded-lg flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateCategory();
+                  }}
+                />
+                <Button
+                  onClick={handleCreateCategory}
+                  disabled={categorySaving || !newCategoryName.trim()}
+                  className="h-9 px-3 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
+                >
+                  {categorySaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
+                </Button>
+              </div>
+
+              {categoryError && (
+                <p className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{categoryError}</p>
+              )}
+
+              {/* Category list */}
+              {categories.length === 0 ? (
+                <div className="text-center py-8">
+                  <FolderOpen className="w-8 h-8 text-gray-600 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">カテゴリがまだありません</p>
+                  <p className="text-xs text-gray-600 mt-1">上のフォームからカテゴリを追加してください</p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  {categories.map((cat) => (
+                    <div
+                      key={cat.id}
+                      className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-gray-800/40 border border-gray-700/20 group/cat"
+                    >
+                      {editingCategoryId === cat.id ? (
+                        <div className="flex items-center gap-2 flex-1">
+                          <Input
+                            value={editingCategoryName}
+                            onChange={(e) => setEditingCategoryName(e.target.value)}
+                            className="h-7 text-sm bg-gray-800/60 border-gray-600/50 text-gray-100 rounded-md flex-1"
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') handleUpdateCategory(cat.id);
+                              if (e.key === 'Escape') { setEditingCategoryId(null); setEditingCategoryName(''); }
+                            }}
+                            autoFocus
+                          />
+                          <button
+                            onClick={() => handleUpdateCategory(cat.id)}
+                            className="p-1 rounded text-green-400 hover:bg-green-500/10 transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => { setEditingCategoryId(null); setEditingCategoryName(''); }}
+                            className="p-1 rounded text-gray-400 hover:bg-gray-700/50 transition-colors text-xs"
+                          >
+                            &#x2715;
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Tag className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                          <span className="text-sm text-gray-200 flex-1 truncate">{cat.name}</span>
+                          <span className="text-[11px] text-gray-600 bg-gray-700/30 px-1.5 py-0.5 rounded-full shrink-0">
+                            {cat._count.assistants}
+                          </span>
+                          <div className="flex items-center gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
+                            <button
+                              onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
+                              className="p-1 rounded hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors"
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteCategory(cat.id)}
+                              className="p-1 rounded hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <p className="text-[11px] text-gray-600 leading-relaxed">
+                カテゴリを削除すると、所属するアシスタントは「未分類」に移動します。
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -389,70 +685,41 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
             </div>
 
             <div className="px-6 py-5 space-y-5">
-              {/* Icon & Name row */}
-              <div className="flex gap-3">
-                {/* Emoji picker */}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-gray-400">アイコン</Label>
-                  <div className="relative">
-                    <div className={`w-14 h-14 rounded-xl ${colorStyle(form.iconColor).bg} border ${colorStyle(form.iconColor).border} flex items-center justify-center text-2xl cursor-pointer`}>
-                      {form.iconEmoji}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-1 space-y-1.5">
-                  <Label className="text-xs text-gray-400">アシスタント名</Label>
-                  <Input
-                    value={form.name}
-                    onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="例: 契約書レビューAI"
-                    className="h-10 text-sm bg-gray-800/60 border-gray-600/50 text-gray-100 placeholder:text-gray-500 rounded-lg"
-                  />
-                  <Input
-                    value={form.description}
-                    onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="説明（任意）"
-                    className="h-9 text-xs bg-gray-800/40 border-gray-700/30 text-gray-300 placeholder:text-gray-600 rounded-lg"
-                  />
-                </div>
+              {/* Name & Description */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-gray-400">アシスタント名</Label>
+                <Input
+                  value={form.name}
+                  onChange={(e) => setForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="例: 契約書レビューAI"
+                  className="h-10 text-sm bg-gray-800/60 border-gray-600/50 text-gray-100 placeholder:text-gray-500 rounded-lg"
+                />
+                <Input
+                  value={form.description}
+                  onChange={(e) => setForm(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="説明（任意）"
+                  className="h-9 text-xs bg-gray-800/40 border-gray-700/30 text-gray-300 placeholder:text-gray-600 rounded-lg"
+                />
               </div>
 
-              {/* Emoji & Color selectors */}
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-400">絵文字</Label>
-                <div className="flex flex-wrap gap-1.5">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => setForm(prev => ({ ...prev, iconEmoji: emoji }))}
-                      className={`w-9 h-9 rounded-lg text-lg flex items-center justify-center transition-all ${
-                        form.iconEmoji === emoji
-                          ? 'bg-indigo-500/20 border border-indigo-500/40 scale-110'
-                          : 'bg-gray-800/40 border border-gray-700/20 hover:bg-gray-700/40'
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-xs text-gray-400">テーマカラー</Label>
-                <div className="flex gap-2">
-                  {Object.entries(ICON_COLORS).map(([key, style]) => (
-                    <button
-                      key={key}
-                      onClick={() => setForm(prev => ({ ...prev, iconColor: key }))}
-                      className={`w-8 h-8 rounded-full ${style.bg} border-2 transition-all ${
-                        form.iconColor === key
-                          ? `${style.border} scale-110 ring-2 ring-offset-2 ring-offset-gray-900 ring-${key === 'indigo' ? 'indigo' : key}-500/30`
-                          : 'border-transparent hover:scale-105'
-                      }`}
-                    />
-                  ))}
-                </div>
+              {/* Category select */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-gray-400">カテゴリ</Label>
+                <Select
+                  value={form.categoryId || 'none'}
+                  onValueChange={(v) => setForm(prev => ({ ...prev, categoryId: v === 'none' ? '' : v }))}
+                >
+                  <SelectTrigger className="h-9 text-sm bg-gray-800/60 border-gray-600/50 text-gray-100 rounded-lg">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未分類</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-600">「カテゴリ管理」から新しいカテゴリを作成できます</p>
               </div>
 
               {/* System prompt */}
@@ -498,7 +765,7 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
                   <Label className="text-xs text-gray-400">会話スターター</Label>
                   <button
                     onClick={addStarter}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+                    className="text-xs px-2 py-0.5 rounded-md bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200 flex items-center gap-1"
                   >
                     <Plus className="w-3 h-3" /> 追加
                   </button>

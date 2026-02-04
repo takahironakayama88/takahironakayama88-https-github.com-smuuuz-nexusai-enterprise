@@ -39,6 +39,12 @@ const ACTION_LABELS: Record<string, { label: string; variant: 'default' | 'secon
   mode_change: { label: 'モード変更', variant: 'secondary' },
   thread_create: { label: 'スレッド作成', variant: 'outline' },
   thread_delete: { label: 'スレッド削除', variant: 'destructive' },
+  assistant_create: { label: 'アシスタント作成', variant: 'outline' },
+  assistant_update: { label: 'アシスタント更新', variant: 'secondary' },
+  assistant_delete: { label: 'アシスタント削除', variant: 'destructive' },
+  category_create: { label: 'カテゴリ作成', variant: 'outline' },
+  category_update: { label: 'カテゴリ更新', variant: 'secondary' },
+  category_delete: { label: 'カテゴリ削除', variant: 'destructive' },
 };
 
 export function OperationLogPanel({ token }: OperationLogPanelProps) {
@@ -169,6 +175,12 @@ export function OperationLogPanel({ token }: OperationLogPanelProps) {
               <SelectItem value="mode_change">モード変更</SelectItem>
               <SelectItem value="thread_create">スレッド作成</SelectItem>
               <SelectItem value="thread_delete">スレッド削除</SelectItem>
+              <SelectItem value="assistant_create">アシスタント作成</SelectItem>
+              <SelectItem value="assistant_update">アシスタント更新</SelectItem>
+              <SelectItem value="assistant_delete">アシスタント削除</SelectItem>
+              <SelectItem value="category_create">カテゴリ作成</SelectItem>
+              <SelectItem value="category_update">カテゴリ更新</SelectItem>
+              <SelectItem value="category_delete">カテゴリ削除</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -212,7 +224,7 @@ export function OperationLogPanel({ token }: OperationLogPanelProps) {
           variant="ghost"
           size="sm"
           onClick={handleReset}
-          className="h-8 text-xs text-gray-400 hover:text-white hover:bg-gray-800/50"
+          className="h-8 text-xs bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
         >
           <RotateCcw className="w-3 h-3 mr-1" />
           リセット
@@ -223,7 +235,7 @@ export function OperationLogPanel({ token }: OperationLogPanelProps) {
             variant="ghost"
             size="sm"
             onClick={handleExport}
-            className="h-8 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+            className="h-8 text-xs bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
           >
             <Download className="w-3 h-3 mr-1" />
             CSV出力
@@ -273,7 +285,7 @@ export function OperationLogPanel({ token }: OperationLogPanelProps) {
                       {log.user.email}
                     </td>
                     <td className="py-2.5 px-3">
-                      <Badge variant={actionInfo.variant} className="text-xs">
+                      <Badge variant={actionInfo.variant} className="text-xs border-0 text-white">
                         {actionInfo.label}
                       </Badge>
                     </td>

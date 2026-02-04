@@ -311,7 +311,7 @@ ${htmlBody}
           size="sm"
           onClick={handleReset}
           disabled={isGenerating}
-          className="h-8 text-xs text-gray-400 hover:text-white hover:bg-gray-800/50"
+          className="h-8 text-xs bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
         >
           <RotateCcw className="w-3 h-3 mr-1" />
           リセット
@@ -322,7 +322,7 @@ ${htmlBody}
             size="sm"
             onClick={handleGenerateClick}
             disabled={isGenerating || loadingScope}
-            className="h-8 text-xs bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/30 border border-indigo-500/30"
+            className="h-8 text-xs bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
           >
             {loadingScope ? (
               <Loader2 className="w-3 h-3 mr-1 animate-spin" />

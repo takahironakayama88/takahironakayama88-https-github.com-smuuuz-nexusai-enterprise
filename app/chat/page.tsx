@@ -56,6 +56,8 @@ interface AssistantData {
   conversationStarters: string;
   visibility: string;
   isActive: boolean;
+  categoryId: string | null;
+  category: { id: string; name: string; displayOrder: number } | null;
 }
 
 const ASSISTANT_COLORS: Record<string, string> = {
@@ -336,6 +338,7 @@ export default function ChatPage() {
     const userMessage = {
       role: 'user' as const,
       content: input,
+      parts: [{ type: 'text' as const, text: input }],
     };
 
     sendMessage(userMessage);
@@ -814,25 +817,75 @@ export default function ChatPage() {
                         <div className="h-px bg-gray-800/50 my-1.5" />
                       )}
 
-                      {assistants.map((assistant) => (
-                        <button
-                          key={assistant.id}
-                          onClick={() => selectAssistant(assistant.id)}
-                          className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
-                            selectedAssistantId === assistant.id
-                              ? `bg-gradient-to-r ${ASSISTANT_COLORS[assistant.iconColor] || ASSISTANT_COLORS.indigo}`
-                              : 'hover:bg-gray-800/50 border border-transparent'
-                          }`}
-                        >
-                          <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${ASSISTANT_COLORS[assistant.iconColor] || ASSISTANT_COLORS.indigo} flex items-center justify-center text-sm`}>
-                            {assistant.iconEmoji}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm text-gray-100 font-medium truncate">{assistant.name}</p>
-                            <p className="text-xs text-gray-500 truncate">{assistant.description || 'カスタムアシスタント'}</p>
-                          </div>
-                        </button>
-                      ))}
+                      {/* Group assistants by category */}
+                      {(() => {
+                        // Build category groups
+                        const categoryMap = new Map<string, { name: string; displayOrder: number; assistants: AssistantData[] }>();
+                        const uncategorized: AssistantData[] = [];
+
+                        assistants.forEach((a) => {
+                          if (a.category) {
+                            const existing = categoryMap.get(a.category.id);
+                            if (existing) {
+                              existing.assistants.push(a);
+                            } else {
+                              categoryMap.set(a.category.id, {
+                                name: a.category.name,
+                                displayOrder: a.category.displayOrder,
+                                assistants: [a],
+                              });
+                            }
+                          } else {
+                            uncategorized.push(a);
+                          }
+                        });
+
+                        const sortedGroups = Array.from(categoryMap.values()).sort((a, b) => a.displayOrder - b.displayOrder);
+
+                        const renderAssistantButton = (assistant: AssistantData) => (
+                          <button
+                            key={assistant.id}
+                            onClick={() => selectAssistant(assistant.id)}
+                            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all ${
+                              selectedAssistantId === assistant.id
+                                ? `bg-gradient-to-r ${ASSISTANT_COLORS[assistant.iconColor] || ASSISTANT_COLORS.indigo}`
+                                : 'hover:bg-gray-800/50 border border-transparent'
+                            }`}
+                          >
+                            <div className={`w-9 h-9 rounded-lg bg-gradient-to-br ${ASSISTANT_COLORS[assistant.iconColor] || ASSISTANT_COLORS.indigo} flex items-center justify-center text-sm`}>
+                              {assistant.iconEmoji}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-gray-100 font-medium truncate">{assistant.name}</p>
+                              <p className="text-xs text-gray-500 truncate">{assistant.description || 'カスタムアシスタント'}</p>
+                            </div>
+                          </button>
+                        );
+
+                        return (
+                          <>
+                            {sortedGroups.map((group) => (
+                              <div key={group.name}>
+                                <div className="px-3 pt-2.5 pb-1">
+                                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">{group.name}</span>
+                                </div>
+                                {group.assistants.map(renderAssistantButton)}
+                              </div>
+                            ))}
+                            {uncategorized.length > 0 && sortedGroups.length > 0 && (
+                              <div>
+                                <div className="px-3 pt-2.5 pb-1">
+                                  <span className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">未分類</span>
+                                </div>
+                                {uncategorized.map(renderAssistantButton)}
+                              </div>
+                            )}
+                            {uncategorized.length > 0 && sortedGroups.length === 0 && (
+                              <>{uncategorized.map(renderAssistantButton)}</>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </>
                 )}
@@ -895,10 +948,11 @@ export default function ChatPage() {
 
             {messages.length > 0 && <div className="pt-6" />}
             {messages.map((message) => {
-              // AI SDK v6: アシスタントメッセージはparts配列、ユーザーメッセージはcontent
-              const messageText = message.role === 'user'
-                ? message.content
-                : (message as any).parts?.map((part: any) => part.text).join('') || '';
+              // AI SDK v6: partsからテキストを取得
+              const messageText = message.parts
+                ?.filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+                .map((part) => part.text)
+                .join('') || '';
 
               // このメッセージのモードIDを取得
               const messageModeId = messageModels[message.id];

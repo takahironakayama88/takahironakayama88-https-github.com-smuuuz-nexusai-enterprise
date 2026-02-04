@@ -202,7 +202,7 @@ export async function POST(request: NextRequest) {
       messages: chatMessages,
       async onFinish({ usage, text }) {
         // トークン使用量を記録
-        const tokensUsed = (usage.promptTokens || 0) + (usage.completionTokens || 0);
+        const tokensUsed = (usage.inputTokens || 0) + (usage.outputTokens || 0);
         const cost = calculateCost(modelId, tokensUsed);
 
         // 組織の使用量を更新
@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
               role: 'user',
               content: userMessage.content,
               modelId,
-              tokensUsed: usage.promptTokens || 0,
+              tokensUsed: usage.inputTokens || 0,
               costEstimate: 0,
             },
           });
@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
               role: 'assistant',
               content: text,
               modelId,
-              tokensUsed: usage.completionTokens || 0,
+              tokensUsed: usage.outputTokens || 0,
               costEstimate: cost,
             },
           });
