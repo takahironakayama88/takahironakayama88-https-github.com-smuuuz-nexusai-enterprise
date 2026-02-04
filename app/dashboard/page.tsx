@@ -90,7 +90,10 @@ export default function DashboardPage() {
 
   const handleMainClick = useCallback((e: React.MouseEvent) => {
     if (dashboardTab !== 'assistants') return;
-    const target = e.target as Node;
+    const target = e.target as HTMLElement;
+    const mainEl = e.currentTarget as HTMLElement;
+    // ポータル経由のクリック（Dialog, Select等）はDOM上<main>外なので無視
+    if (!mainEl.contains(target)) return;
     if (assistantSectionRef.current?.contains(target)) return;
     if (tabNavRef.current?.contains(target)) return;
     setDashboardTab('settings');

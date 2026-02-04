@@ -387,7 +387,7 @@ ${htmlBody}
                 variant="ghost"
                 size="sm"
                 onClick={handleExportWord}
-                className="h-7 text-xs text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+                className="h-7 text-xs bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200"
               >
                 <Download className="w-3 h-3 mr-1" />
                 Word出力

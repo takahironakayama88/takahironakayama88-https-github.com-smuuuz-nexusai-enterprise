@@ -10,7 +10,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Pagination } from './Pagination';
 import { Loader2, Download, Search, RotateCcw } from 'lucide-react';
 
@@ -284,10 +283,8 @@ export function OperationLogPanel({ token }: OperationLogPanelProps) {
                     <td className="py-2.5 px-3 text-xs text-gray-300 font-mono">
                       {log.user.email}
                     </td>
-                    <td className="py-2.5 px-3">
-                      <Badge variant={actionInfo.variant} className="text-xs border-0 text-white">
-                        {actionInfo.label}
-                      </Badge>
+                    <td className="py-2.5 px-3 text-xs text-white">
+                      {actionInfo.label}
                     </td>
                     <td className="py-2.5 px-3 text-xs text-gray-400 max-w-[200px] truncate">
                       {formatMetadata(log.metadata)}

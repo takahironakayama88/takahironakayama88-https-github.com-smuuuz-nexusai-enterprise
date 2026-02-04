@@ -322,6 +322,7 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
   };
 
   const handleDeleteCategory = async (id: string) => {
+    if (!confirm('このカテゴリを削除しますか？\n所属するアシスタントは「未分類」に移動します。')) return;
     setCategorySaving(true);
     setCategoryError('');
 
@@ -642,15 +643,15 @@ export function AssistantManagementSection({ token }: AssistantManagementSection
                           <div className="flex items-center gap-0.5 opacity-0 group-hover/cat:opacity-100 transition-opacity">
                             <button
                               onClick={() => { setEditingCategoryId(cat.id); setEditingCategoryName(cat.name); }}
-                              className="p-1 rounded hover:bg-indigo-500/10 text-gray-400 hover:text-indigo-400 transition-colors"
+                              className="p-1 bg-transparent border-0 text-white hover:opacity-60 transition-opacity"
                             >
-                              <Pencil className="w-3 h-3" />
+                              <Pencil className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteCategory(cat.id)}
-                              className="p-1 rounded hover:bg-red-500/10 text-gray-400 hover:text-red-400 transition-colors"
+                              className="p-1 bg-transparent border-0 text-white hover:opacity-60 transition-opacity"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </>
