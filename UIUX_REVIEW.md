@@ -1,4 +1,4 @@
-# NexusAI-Enterprise UI/UX レビュー & 改善提案
+# sunsun UI/UX レビュー & 改善提案
 
 ---
 
@@ -161,7 +161,7 @@ model OrganizationMetrics {
 - Gemini Advanced: $20 × 3人 = $60/月
 - **合計: $360/月**
 
-**NexusAI-Enterprise導入後**:
+**sunsun導入後**:
 - API従量課金: 約$80/月（実測値）
 - Pro Tier: $29/月
 - **合計: $109/月**

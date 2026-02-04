@@ -79,7 +79,7 @@ async function main() {
           },
           {
             role: 'assistant',
-            content: 'こんにちは！NexusAI Enterpriseへようこそ。どのようなお手伝いができますか？',
+            content: 'こんにちは！sunsunへようこそ。どのようなお手伝いができますか？',
             modelId: 'gpt-4',
             tokensUsed: 25,
             costEstimate: 0.0005,

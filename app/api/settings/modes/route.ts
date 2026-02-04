@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         fastModeModel: true,
         balancedModeModel: true,
         precisionModeModel: true,
+        settingsMode: true,
         encOpenaiKey: true,
         encAnthropicKey: true,
         encGoogleKey: true,
@@ -118,6 +119,7 @@ export async function GET(request: NextRequest) {
         balanced: organization.balancedModeModel,
         precision: organization.precisionModeModel,
       },
+      settingsMode: organization.settingsMode,
       availableModels,
     });
   } catch (error) {
@@ -145,10 +147,11 @@ export async function PUT(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { fast, balanced, precision } = body as {
+    const { fast, balanced, precision, settingsMode } = body as {
       fast?: string | null;
       balanced?: string | null;
       precision?: string | null;
+      settingsMode?: 'simple' | 'custom';
     };
 
     // 更新データを構築
@@ -156,11 +159,13 @@ export async function PUT(request: NextRequest) {
       fastModeModel?: string | null;
       balancedModeModel?: string | null;
       precisionModeModel?: string | null;
+      settingsMode?: string;
     } = {};
 
     if (fast !== undefined) updateData.fastModeModel = fast || null;
     if (balanced !== undefined) updateData.balancedModeModel = balanced || null;
     if (precision !== undefined) updateData.precisionModeModel = precision || null;
+    if (settingsMode !== undefined) updateData.settingsMode = settingsMode;
 
     await prisma.organization.update({
       where: { id: decoded.organizationId },
@@ -171,7 +176,7 @@ export async function PUT(request: NextRequest) {
       organizationId: decoded.organizationId,
       userId: decoded.userId,
       action: 'mode_change',
-      metadata: { fast, balanced, precision },
+      metadata: { fast, balanced, precision, settingsMode },
       request,
     });
 

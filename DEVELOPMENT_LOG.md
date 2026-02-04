@@ -1,7 +1,7 @@
-# NexusAI-Enterprise 開発進捗ログ
+# sunsun 開発進捗ログ
 
 ## プロジェクト概要
-マルチAIチャットプラットフォーム「NexusAI-Enterprise」の開発
+マルチAIチャットプラットフォーム「sunsun」の開発
 
 ### 技術スタック
 - **フロントエンド**: Next.js 15 (App Router), React 19, TypeScript

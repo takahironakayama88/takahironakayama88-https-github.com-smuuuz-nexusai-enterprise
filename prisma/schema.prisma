@@ -27,6 +27,7 @@ model Organization {
   fastModeModel       String?  @map("fast_mode_model")      // 高速モード
   balancedModeModel   String?  @map("balanced_mode_model")  // バランスモード
   precisionModeModel  String?  @map("precision_mode_model") // 高精度モード
+  settingsMode        String   @default("simple") @map("settings_mode") // simple or custom
 
   createdAt           DateTime @default(now()) @map("created_at")
   updatedAt           DateTime @updatedAt @map("updated_at")

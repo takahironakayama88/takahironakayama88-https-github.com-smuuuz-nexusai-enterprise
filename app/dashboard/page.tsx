@@ -19,9 +19,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Key, LogOut, MessageSquare, User, Building2, Loader2, Sparkles, Zap, Settings, Shield, Bot } from 'lucide-react';
+import { Key, LogOut, MessageSquare, User, Building2, Loader2, Zap, Settings, Shield, Bot } from 'lucide-react';
 import { AuditSection } from '@/components/audit/AuditSection';
 import { AssistantManagementSection } from '@/components/assistants/AssistantManagementSection';
+import { SIMPLE_MODE_PRESETS, AI_MODELS } from '@/lib/ai/providers';
 
 interface UserData {
   id: string;
@@ -88,6 +89,13 @@ export default function DashboardPage() {
   const assistantSectionRef = useRef<HTMLDivElement>(null);
   const tabNavRef = useRef<HTMLDivElement>(null);
 
+  // シンプル/カスタム設定の状態
+  const [settingsMode, setSettingsMode] = useState<'simple' | 'custom'>('simple');
+  const [simpleProvider, setSimpleProvider] = useState<Provider>('openai');
+  const [simpleApiKeyInput, setSimpleApiKeyInput] = useState('');
+  const [isSavingSimple, setIsSavingSimple] = useState(false);
+  const [simpleMessage, setSimpleMessage] = useState('');
+
   const handleMainClick = useCallback((e: React.MouseEvent) => {
     if (dashboardTab !== 'assistants') return;
     const target = e.target as HTMLElement;
@@ -147,6 +155,16 @@ export default function DashboardPage() {
         console.log('📊 Available models:', data.availableModels);
         setModeSettings(data.modeSettings);
         setAvailableModels(data.availableModels || []);
+        if (data.settingsMode) {
+          setSettingsMode(data.settingsMode);
+        }
+        // simpleProviderをモード設定から推定
+        if (data.modeSettings.balanced && data.availableModels) {
+          const model = data.availableModels.find((m: AvailableModel) => m.id === data.modeSettings.balanced);
+          if (model) {
+            setSimpleProvider(model.provider as Provider);
+          }
+        }
       } else {
         console.error('Failed to load mode settings:', response.status);
       }
@@ -166,7 +184,7 @@ export default function DashboardPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(modeSettings),
+        body: JSON.stringify({ ...modeSettings, settingsMode: 'custom' }),
       });
 
       if (response.ok) {
@@ -188,6 +206,95 @@ export default function DashboardPage() {
       ...prev,
       [mode]: modelId === 'none' ? null : modelId,
     }));
+  };
+
+  const handleSimpleSave = async () => {
+    if (!simpleApiKeyInput.trim() && !apiKeyStatus[simpleProvider]) {
+      setSimpleMessage('APIキーを入力してください');
+      return;
+    }
+
+    setIsSavingSimple(true);
+    setSimpleMessage('');
+
+    try {
+      // 1. APIキーが入力されている場合は保存
+      if (simpleApiKeyInput.trim()) {
+        const keyResponse = await fetch('/api/settings/api-keys', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            provider: simpleProvider,
+            apiKey: simpleApiKeyInput.trim(),
+          }),
+        });
+
+        if (!keyResponse.ok) {
+          const data = await keyResponse.json();
+          setSimpleMessage(data.error || 'APIキーの設定に失敗しました');
+          return;
+        }
+      }
+
+      // 2. モード自動割り当て
+      const preset = SIMPLE_MODE_PRESETS[simpleProvider];
+      const modeResponse = await fetch('/api/settings/modes', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          fast: preset.fast,
+          balanced: preset.balanced,
+          precision: preset.precision,
+          settingsMode: 'simple',
+        }),
+      });
+
+      if (modeResponse.ok) {
+        setSimpleMessage('設定を保存しました');
+        setSimpleApiKeyInput('');
+        await loadApiKeyStatus(token);
+        await loadModeSettings(token);
+        setTimeout(() => setSimpleMessage(''), 3000);
+      } else {
+        const data = await modeResponse.json();
+        setSimpleMessage(data.error || 'モード設定の保存に失敗しました');
+      }
+    } catch {
+      setSimpleMessage('設定の保存中にエラーが発生しました');
+    } finally {
+      setIsSavingSimple(false);
+    }
+  };
+
+  const handleSettingsModeSwitch = async (mode: 'simple' | 'custom') => {
+    if (mode === settingsMode) return;
+
+    if (mode === 'simple') {
+      if (!confirm('シンプル設定に切り替えると、モードのモデル割り当てが自動設定に変更されます。続行しますか？')) {
+        return;
+      }
+    }
+
+    setSettingsMode(mode);
+
+    try {
+      await fetch('/api/settings/modes', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ settingsMode: mode }),
+      });
+    } catch (error) {
+      console.error('Failed to save settings mode:', error);
+    }
   };
 
   const handleOpenDialog = (provider: Provider) => {
@@ -282,14 +389,9 @@ export default function DashboardPage() {
       {/* ヘッダー */}
       <header className="relative border-b border-gray-800/50 backdrop-blur-xl bg-black/40">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-              <Sparkles className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">NexusAI</h1>
-              <p className="text-xs text-gray-500">{user.organizationName}</p>
-            </div>
+          <div>
+            <h1 className="text-xl font-bold text-white">sunsun</h1>
+            <p className="text-xs text-gray-500">{user.organizationName}</p>
           </div>
           <Button
             variant="ghost"
@@ -356,6 +458,32 @@ export default function DashboardPage() {
         {/* 設定タブ */}
         {dashboardTab === 'settings' && (
         <>
+        {/* 設定モード切替 */}
+        {user.role === 'OWNER' && (
+          <div className="flex gap-1 p-1 mb-6 backdrop-blur-xl bg-gray-800/40 rounded-lg border border-gray-700/30 w-fit">
+            <button
+              onClick={() => handleSettingsModeSwitch('simple')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                settingsMode === 'simple'
+                  ? 'bg-black text-white border border-gray-600/50'
+                  : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
+              }`}
+            >
+              シンプル設定
+            </button>
+            <button
+              onClick={() => handleSettingsModeSwitch('custom')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+                settingsMode === 'custom'
+                  ? 'bg-black text-white border border-gray-600/50'
+                  : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
+              }`}
+            >
+              カスタム設定
+            </button>
+          </div>
+        )}
+
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {/* ユーザー情報カード */}
           <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
@@ -393,7 +521,120 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* シンプル設定カード */}
+          {settingsMode === 'simple' && (
+          <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-gray-400" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold">AI設定</h3>
+                <p className="text-xs text-gray-500">プロバイダーを選んでAPIキーを入力</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* プロバイダー選択 */}
+              <div>
+                <Label className="text-sm text-gray-300 mb-2 block">AIプロバイダー</Label>
+                <div className="flex gap-2">
+                  {(['openai', 'anthropic', 'google'] as Provider[]).map((provider) => (
+                    <button
+                      key={provider}
+                      onClick={() => setSimpleProvider(provider)}
+                      disabled={user.role !== 'OWNER'}
+                      className={`flex-1 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 ${
+                        simpleProvider === provider
+                          ? 'bg-black text-white border border-gray-600/50'
+                          : 'bg-gray-800/60 text-gray-400 border border-gray-700/30 hover:bg-gray-800 hover:text-gray-300'
+                      }`}
+                    >
+                      {PROVIDER_INFO[provider].name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* APIキー入力 */}
+              <div className="space-y-1.5">
+                <Label className="text-sm text-gray-300">APIキー</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="password"
+                    placeholder={apiKeyStatus[simpleProvider] ? '設定済み（変更する場合は入力）' : 'sk-...'}
+                    value={simpleApiKeyInput}
+                    onChange={(e) => setSimpleApiKeyInput(e.target.value)}
+                    disabled={isSavingSimple || user.role !== 'OWNER'}
+                    className="h-9 text-sm bg-gray-800/60 border-gray-600/50 text-gray-100 placeholder:text-gray-500 focus:border-indigo-500/60 rounded-lg flex-1"
+                  />
+                  {apiKeyStatus[simpleProvider] && (
+                    <span className="text-[11px] text-green-400 font-medium whitespace-nowrap">接続中</span>
+                  )}
+                </div>
+              </div>
+
+              {/* 自動割り当てモデルプレビュー */}
+              <div className="space-y-1.5">
+                <Label className="text-sm text-gray-300">モデル自動割り当て</Label>
+                <div className="bg-gray-800/40 rounded-lg p-3 space-y-2">
+                  {(['fast', 'balanced', 'precision'] as const).map((mode) => {
+                    const preset = SIMPLE_MODE_PRESETS[simpleProvider];
+                    const modelId = preset[mode];
+                    const modelConfig = AI_MODELS[modelId];
+                    const modeLabels = { fast: '高速', balanced: 'バランス', precision: '高精度' };
+                    return (
+                      <div key={mode} className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">{modeLabels[mode]}</span>
+                        <span className="text-xs text-gray-300">{modelConfig.displayName}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 保存ボタン */}
+              {user.role === 'OWNER' && (
+                <div className="pt-1">
+                  <Button
+                    size="sm"
+                    onClick={handleSimpleSave}
+                    disabled={isSavingSimple || (!simpleApiKeyInput.trim() && !apiKeyStatus[simpleProvider])}
+                    className="w-full h-9 text-sm bg-black text-white border border-gray-600/50 hover:bg-white hover:text-black transition-all duration-200 rounded-lg"
+                  >
+                    {isSavingSimple ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                        保存中
+                      </>
+                    ) : (
+                      '設定を保存'
+                    )}
+                  </Button>
+                  {simpleMessage && (
+                    <p className={`text-xs mt-2 ${
+                      simpleMessage.includes('保存しました')
+                        ? 'text-green-400'
+                        : 'text-red-400'
+                    }`}>
+                      {simpleMessage}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {user.role !== 'OWNER' && (
+                <p className="text-xs text-gray-600 pt-2 border-t border-gray-800">
+                  ※ 設定にはOWNER権限が必要です
+                </p>
+              )}
+            </div>
+          </div>
+          )}
+
           {/* APIキー設定カード */}
+          {settingsMode === 'custom' && (
+          <>
           <div className="backdrop-blur-xl bg-gray-900/60 border border-gray-700/50 rounded-2xl p-6 shadow-xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-gray-800 flex items-center justify-center">
@@ -568,6 +809,8 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
+          </>
+          )}
 
           {/* チャット開始カード */}
           <div className="backdrop-blur-xl bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border border-indigo-500/20 rounded-2xl p-6 shadow-xl">

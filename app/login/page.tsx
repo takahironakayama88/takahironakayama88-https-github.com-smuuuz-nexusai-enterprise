@@ -65,7 +65,7 @@ export default function LoginPage() {
             <Sparkles className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-3xl font-bold text-white mb-2">
-            NexusAI
+            sunsun
           </h1>
           <p className="text-gray-400">
             マルチAIチャットプラットフォーム
@@ -161,7 +161,7 @@ export default function LoginPage() {
 
         {/* フッター */}
         <p className="text-center text-gray-600 text-xs mt-6">
-          NexusAI Enterprise v1.0
+          sunsun v1.0
         </p>
       </div>
     </div>

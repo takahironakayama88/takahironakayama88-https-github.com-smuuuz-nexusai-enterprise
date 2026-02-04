@@ -30,6 +30,15 @@ export const AI_MODELS = {
 export type ModelId = keyof typeof AI_MODELS;
 
 /**
+ * シンプル設定: プロバイダーごとの自動モード割り当て
+ */
+export const SIMPLE_MODE_PRESETS: Record<string, { fast: ModelId; balanced: ModelId; precision: ModelId }> = {
+  openai: { fast: 'gpt-3.5-turbo', balanced: 'gpt-4-turbo', precision: 'gpt-4' },
+  anthropic: { fast: 'claude-sonnet-4', balanced: 'claude-sonnet-4-5', precision: 'claude-opus-4-1' },
+  google: { fast: 'gemini-2.5-flash', balanced: 'gemini-2.5-pro', precision: 'gemini-2.5-pro' },
+};
+
+/**
  * 組織のAPIキーを使用してAIモデルを取得
  */
 export async function getAIModel(
