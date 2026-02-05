@@ -1,11 +1,11 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: nexusai-postgres
+    container_name: sunsun-postgres
     environment:
-      POSTGRES_USER: nexusai
-      POSTGRES_PASSWORD: nexusai_dev_password
-      POSTGRES_DB: nexusai_db
+      POSTGRES_USER: sunsun
+      POSTGRES_PASSWORD: sunsun_dev_password
+      POSTGRES_DB: sunsun_db
     ports:
       - "5432:5432"
     volumes:

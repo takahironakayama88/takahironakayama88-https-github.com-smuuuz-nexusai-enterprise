@@ -247,7 +247,7 @@ const isLoading = status === 'submitted' || status === 'streaming';
 
 ### コアファイル
 ```
-nexusai-enterprise/
+sunsun/
 ├── app/
 │   ├── api/
 │   │   ├── auth/login/route.ts          # JWT認証

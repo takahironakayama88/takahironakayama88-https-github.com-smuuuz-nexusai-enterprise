@@ -1,8 +1,8 @@
-# NexusAI Enterprise セットアップログ
+# SunSun セットアップログ
 
 ## プロジェクト概要
 
-- **アプリ名**: sunsun (NexusAI Enterprise)
+- **アプリ名**: SunSun
 - **技術スタック**: Next.js 16, React 19, TypeScript 5.9, Prisma ORM 6.19, Tailwind CSS 4
 - **AI対応**: OpenAI / Anthropic / Google（Vercel AI SDK経由）
 - **認証**: JWT（jsonwebtoken）
