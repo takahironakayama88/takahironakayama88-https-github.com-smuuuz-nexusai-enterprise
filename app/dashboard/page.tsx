@@ -95,6 +95,8 @@ export default function DashboardPage() {
   const [simpleApiKeyInput, setSimpleApiKeyInput] = useState('');
   const [isSavingSimple, setIsSavingSimple] = useState(false);
   const [simpleMessage, setSimpleMessage] = useState('');
+  const [isSwitchingMode, setIsSwitchingMode] = useState(false);
+  const [showModeConfirmDialog, setShowModeConfirmDialog] = useState(false);
 
   const handleMainClick = useCallback((e: React.MouseEvent) => {
     if (dashboardTab !== 'assistants') return;
@@ -272,15 +274,20 @@ export default function DashboardPage() {
     }
   };
 
-  const handleSettingsModeSwitch = async (mode: 'simple' | 'custom') => {
-    if (mode === settingsMode) return;
+  const handleSettingsModeSwitch = (mode: 'simple' | 'custom') => {
+    if (mode === settingsMode || isSwitchingMode) return;
 
     if (mode === 'simple') {
-      if (!confirm('シンプル設定に切り替えると、モードのモデル割り当てが自動設定に変更されます。続行しますか？')) {
-        return;
-      }
+      setShowModeConfirmDialog(true);
+      return;
     }
 
+    executeModeSwitchTo(mode);
+  };
+
+  const executeModeSwitchTo = async (mode: 'simple' | 'custom') => {
+    setShowModeConfirmDialog(false);
+    setIsSwitchingMode(true);
     setSettingsMode(mode);
 
     try {
@@ -294,6 +301,8 @@ export default function DashboardPage() {
       });
     } catch (error) {
       console.error('Failed to save settings mode:', error);
+    } finally {
+      setIsSwitchingMode(false);
     }
   };
 
@@ -463,22 +472,30 @@ export default function DashboardPage() {
           <div className="flex gap-1 p-1 mb-6 backdrop-blur-xl bg-gray-800/40 rounded-lg border border-gray-700/30 w-fit">
             <button
               onClick={() => handleSettingsModeSwitch('simple')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              disabled={isSwitchingMode}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
                 settingsMode === 'simple'
                   ? 'bg-black text-white border border-gray-600/50'
                   : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
-              }`}
+              } ${isSwitchingMode ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
+              {isSwitchingMode && settingsMode !== 'simple' && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              )}
               シンプル設定
             </button>
             <button
               onClick={() => handleSettingsModeSwitch('custom')}
-              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
+              disabled={isSwitchingMode}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
                 settingsMode === 'custom'
                   ? 'bg-black text-white border border-gray-600/50'
                   : 'bg-transparent text-white hover:bg-white hover:text-black border border-transparent'
-              }`}
+              } ${isSwitchingMode ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
+              {isSwitchingMode && settingsMode !== 'custom' && (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              )}
               カスタム設定
             </button>
           </div>
@@ -852,6 +869,47 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      {/* モード切替確認ダイアログ */}
+      <Dialog open={showModeConfirmDialog} onOpenChange={setShowModeConfirmDialog}>
+        <DialogContent className="max-w-[320px] p-0 bg-transparent border-none shadow-none">
+          <div className="backdrop-blur-xl bg-gray-900/95 border border-gray-700/50 rounded-2xl p-5 shadow-2xl">
+            {/* アイコン */}
+            <div className="flex justify-center mb-3">
+              <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                <Zap className="w-6 h-6 text-amber-400" />
+              </div>
+            </div>
+
+            {/* タイトル */}
+            <DialogHeader className="text-center space-y-1.5">
+              <DialogTitle className="text-base font-semibold text-gray-100">
+                シンプル設定に切り替え
+              </DialogTitle>
+              <DialogDescription className="text-xs text-gray-400">
+                モードのモデル割り当てが自動設定に変更されます。続行しますか？
+              </DialogDescription>
+            </DialogHeader>
+
+            {/* ボタン */}
+            <div className="flex gap-2 mt-5">
+              <Button
+                variant="ghost"
+                onClick={() => setShowModeConfirmDialog(false)}
+                className="flex-1 h-10 text-sm text-gray-300 hover:text-gray-100 bg-gray-800/50 hover:bg-gray-800 border border-gray-700/50 rounded-xl transition-all duration-200"
+              >
+                キャンセル
+              </Button>
+              <Button
+                onClick={() => executeModeSwitchTo('simple')}
+                className="flex-1 h-10 text-sm bg-amber-500 hover:bg-amber-600 text-white rounded-xl transition-all duration-200"
+              >
+                切り替える
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* APIキー設定ダイアログ */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
